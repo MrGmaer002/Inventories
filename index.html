@@ -1,0 +1,1417 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مخازن - إدارة المستودعات ونقاط البيع</title>
+
+    <!-- Google Fonts: Cairo & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Outfit:wght@400;600;700&display=swap"
+        rel="stylesheet">
+
+    <!-- FontAwesome Icons CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Main Stylesheet -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+    <!-- ==========================================================================
+         1. Window Header / Titlebar
+         ========================================================================== -->
+    <header class="pancafe-titlebar">
+        <div class="brand-section">
+            <div class="brand-icon">
+                <i class="fas fa-boxes-stacked"></i>
+            </div>
+            <div class="brand-title" id="brand-store-name">مخازن</div>
+            <span class="brand-version">Warehouse Suite v3.5</span>
+        </div>
+
+        <div class="window-user-info">
+            <div class="user-badge" id="top-user-badge" style="cursor: pointer;"
+                onclick="window.auth.openSwitchUserModal()" title="انقر لتبديل المستخدم الحالي">
+                <span id="current-user-avatar">👨‍💼</span>
+                <strong id="current-user-name">المدير العام</strong>
+                <span class="role-tag admin" id="current-user-role">المدير العام</span>
+            </div>
+
+            <div class="window-controls">
+                <button class="win-btn" title="تبديل المستخدم / تسجيل خروج"
+                    onclick="window.auth.openSwitchUserModal()">
+                    <i class="fas fa-right-left"></i>
+                </button>
+                <button class="win-btn" title="قفل الشاشة" onclick="window.auth.lockScreen()">
+                    <i class="fas fa-lock"></i>
+                </button>
+                <button class="win-btn" title="الإعدادات" onclick="window.app.openModal('settings-modal')">
+                    <i class="fas fa-cog"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- ==========================================================================
+         2. Main Ribbon Action Toolbar
+         ========================================================================== -->
+    <nav class="pancafe-toolbar">
+        <div class="toolbar-group">
+            <!-- POS Quick Sell (Available to All Roles) -->
+            <button class="toolbar-btn btn-accent" id="btn-open-pos" onclick="window.pos.openPosModal()">
+                <i class="fas fa-cash-register"></i>
+                <span>نقطة بيع سريعة (POS)</span>
+            </button>
+
+            <!-- Admin Only: Add Item -->
+            <button class="toolbar-btn btn-success admin-only" id="btn-add-item"
+                onclick="window.inventory.openAddItemModal()">
+                <i class="fas fa-plus-circle"></i>
+                <span>إضافة بضاعة للمخزن</span>
+            </button>
+
+            <!-- Daily Report / Shift Summary -->
+            <button class="toolbar-btn btn-warning" id="btn-daily-report"
+                onclick="window.reports.openDailyReportModal()">
+                <i class="fas fa-chart-line"></i>
+                <span>تقرير الوردية واليومية</span>
+            </button>
+
+            <!-- Shift Stats & Shift Close Button -->
+            <button class="toolbar-btn"
+                style="border-color: #00d2ff; color: #7ce8ff; background: rgba(0, 210, 255, 0.08);"
+                id="btn-close-shift-top" onclick="window.reports.openSecureCloseShiftModal()">
+                <i class="fas fa-chart-pie" style="color: var(--primary-cyan);"></i>
+                <span>إحصائيات وتقفيل الشفت</span>
+            </button>
+        </div>
+
+        <div class="toolbar-separator"></div>
+
+        <div class="toolbar-group">
+            <!-- Admin Only: User Management -->
+            <button class="toolbar-btn admin-only" id="btn-manage-users"
+                onclick="window.app.openModal('users-modal'); window.auth.renderUsersList();">
+                <i class="fas fa-users-cog"></i>
+                <span>إدارة الموظفين واليوزرات</span>
+            </button>
+
+            <!-- Admin Only: Backup Data -->
+            <button class="toolbar-btn admin-only" id="btn-backup-data" onclick="window.app.exportBackup()">
+                <i class="fas fa-database"></i>
+                <span>نسخة احتياطية</span>
+            </button>
+
+            <!-- Lock Screen Quick Button -->
+            <button class="toolbar-btn" onclick="window.auth.lockScreen()">
+                <i class="fas fa-user-lock"></i>
+                <span>قفل الشاشة</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- ==========================================================================
+         3. Clean Search & Action Bar (كل الأصناف معاً)
+         ========================================================================== -->
+    <div class="filter-bar">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <div
+                style="font-size: 14px; font-weight: bold; color: var(--text-highlight); display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-boxes-stacked" style="color: var(--primary-cyan);"></i>
+                <span>قائمة أصناف المخزن</span>
+                <span class="badge badge-success" id="items-count-badge">0 صنف</span>
+            </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="search-box" style="width: 320px;">
+                <i class="fas fa-search"></i>
+                <input type="text" id="search-items-input" placeholder="بحث فوري بالاسم أو الباركود..."
+                    class="selectable-text">
+            </div>
+
+            <div class="view-toggles">
+                <button class="view-btn active" data-view="grid" title="عرض بطاقات / كبائن">
+                    <i class="fas fa-th-large"></i>
+                </button>
+                <button class="view-btn" data-view="table" title="عرض جدول تفصيلي">
+                    <i class="fas fa-list"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================================================
+         4. Main Content Area (Items Grid or Table)
+         ========================================================================== -->
+    <!-- ==========================================================================
+         NEW SHIFT PROMPT DIALOG - يظهر بعد تقفيل الوردية ويسأل عن بدء شفت جديد
+         ========================================================================== -->
+    <div id="shift-locked-overlay"
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(10,13,20,0.85); backdrop-filter: blur(8px); z-index:9000; flex-direction:column; align-items:center; justify-content:center; padding: 20px;">
+        <div
+            style="text-align:center; max-width:540px; width: 100%; padding:26px; background: #19202c; border: 1px solid #364259; border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,0.7);">
+            <div
+                style="width:68px; height:68px; background:rgba(0,230,118,0.15); border:2px solid var(--status-green); border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 16px auto; font-size:32px; color:var(--status-green);">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <h1 style="color:#fff; font-size:22px; margin-bottom:6px; font-weight:bold;">تم تقفيل الشفت وتصفير الدرج
+                بنجاح!</h1>
+            <p style="color:var(--text-secondary); font-size:13px; margin-bottom:16px;">تم تثبيت مبيعات الشفت في الأرشيف
+                وتصفير نقدية الدرج فوراً إلى 0.00 ج.م</p>
+
+            <div id="shift-locked-summary"
+                style="background:#131722; border:1px solid #2d3648; border-radius:10px; padding:16px; margin-bottom:20px; text-align:right;">
+            </div>
+
+            <div
+                style="font-size:16px; font-weight:bold; color:var(--text-highlight); margin-bottom:16px; display:flex; align-items:center; justify-content:center; gap:8px;">
+                <i class="fas fa-question-circle" style="color:var(--primary-cyan);"></i>
+                <span>هل تريد بدء شفت جديد الآن؟</span>
+            </div>
+
+            <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+                <button class="btn btn-primary"
+                    style="font-size:15px; padding:12px 28px; font-weight:bold; background:linear-gradient(135deg, #0084ff 0%, #00d2ff 100%); border:none; box-shadow:0 4px 15px rgba(0,210,255,0.3);"
+                    onclick="window.reports.openNewShift()">
+                    <i class="fas fa-play"></i>
+                    <span>نعم، بدء شفت جديد والبيع الآن</span>
+                </button>
+                <button class="btn btn-secondary" style="font-size:14px; padding:12px 20px;"
+                    onclick="window.reports.printLastClosedShift()">
+                    <i class="fas fa-print"></i>
+                    <span>طباعة التقرير</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <main class="pancafe-main" id="items-view-container">
+        <!-- Rendered dynamically by inventory.js -->
+    </main>
+
+    <!-- ==========================================================================
+         5. Bottom Status Bar
+         ========================================================================== -->
+    <footer class="pancafe-statusbar">
+        <div class="statusbar-section">
+            <div class="status-item">
+                <i class="fas fa-circle" style="color: var(--status-green); font-size: 8px;"></i>
+                <span>النظام: <strong>متصل وجاهز</strong></span>
+            </div>
+            <div class="status-item">
+                <i class="fas fa-user-tie"></i>
+                <span>الكاشير الحالي: <strong id="status-bar-cashier">المدير العام</strong></span>
+            </div>
+            <div class="status-item">
+                <i class="fas fa-business-time"></i>
+                <span>الوردية النشطة: <strong id="status-active-shift-badge" style="color: var(--primary-cyan);">وردية
+                        #1</strong></span>
+            </div>
+            <div class="status-item">
+                <i class="fas fa-boxes"></i>
+                <span>إجمالي الأصناف: <strong id="items-count-display">0 صنف</strong></span>
+            </div>
+        </div>
+
+        <div class="statusbar-section">
+            <div class="status-item">
+                <i class="fas fa-shopping-bag"></i>
+                <span>فواتير الوردية: <strong id="status-today-sales-count">0</strong></span>
+            </div>
+            <div class="status-item highlight">
+                <i class="fas fa-coins" style="color: #ffd700;"></i>
+                <span>فلوس الوردية الحالية: <strong id="status-today-cash">0.00 ج.م</strong></span>
+            </div>
+            <div class="live-time-display" id="live-clock">
+                --:--:--
+            </div>
+        </div>
+    </footer>
+
+    <!-- ==========================================================================
+         MODAL 1: POS / Quick Sell Modal (نقطة البيع السريعة)
+         ========================================================================== -->
+    <div class="modal-overlay" id="pos-modal">
+        <div class="modal-window full">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-cash-register"></i>
+                    <span>نقطة البيع وصرف البضاعة (POS Register)</span>
+                </div>
+                <button class="modal-close-btn" onclick="window.app.closeModal('pos-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="padding: 14px;">
+                <div class="pos-layout">
+                    <!-- Left: Quick Select Grid -->
+                    <div class="pos-items-selector">
+                        <div
+                            style="font-size: 13px; font-weight: 700; color: var(--text-highlight); margin-bottom: 6px;">
+                            <i class="fas fa-hand-pointer"></i> اضغط على الصنف لإضافته للفاتورة:
+                        </div>
+                        <div id="pos-selector-grid"
+                            style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px;">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Right: Cart Panel -->
+                    <div class="pos-cart-panel">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 6px;">
+                            <strong style="font-size: 13px; color: #fff;"><i class="fas fa-shopping-cart"></i> سلة البيع
+                                (<span id="pos-cart-count">0</span>)</strong>
+                            <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px;"
+                                onclick="window.pos.clearCart()">
+                                تفريغ السلة
+                            </button>
+                        </div>
+
+                        <!-- Cart Items List -->
+                        <div class="cart-items-list" id="pos-cart-list">
+                            <!-- Populated dynamically -->
+                        </div>
+
+                        <!-- Customer Info & Discount -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                            <div class="form-group">
+                                <label>اسم العميل / الطاولة</label>
+                                <input type="text" id="pos-customer-input" class="form-control" value="عميل نقدي">
+                            </div>
+                            <div class="form-group">
+                                <label>خصم إضافي (ج.م)</label>
+                                <input type="number" id="pos-discount-input" class="form-control" value="0" min="0"
+                                    step="1">
+                            </div>
+                        </div>
+
+                        <!-- Cash Received & Change Calculator -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                            <div class="form-group">
+                                <label>المبلغ المستلم من العميل</label>
+                                <input type="number" id="pos-paid-input" class="form-control"
+                                    placeholder="المبلغ المدفوع">
+                            </div>
+                            <div class="form-group">
+                                <label>الباقي للعميل</label>
+                                <div id="pos-cart-change"
+                                    style="font-family: var(--font-mono); font-size: 14px; font-weight: bold; color: var(--primary-cyan); padding-top: 6px;">
+                                    0.00 ج.م
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Cart Totals Summary -->
+                        <div class="cart-summary">
+                            <div class="cart-summary-row">
+                                <span>المجموع:</span>
+                                <span id="pos-cart-subtotal">0.00 ج.م</span>
+                            </div>
+                            <div class="cart-summary-row total">
+                                <span>الصافي المطلوب:</span>
+                                <span id="pos-cart-total">0.00 ج.م</span>
+                            </div>
+                        </div>
+
+                        <!-- Checkout Action Button -->
+                        <button class="btn btn-primary" id="pos-checkout-btn"
+                            style="padding: 12px; font-size: 15px; font-weight: bold; width: 100%;"
+                            onclick="window.pos.processCheckout()">
+                            <i class="fas fa-check-circle"></i>
+                            <span>إتمام البيع وطباعة الفاتورة</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================================================
+         MODAL 2: Add / Edit Item Modal (إضافة وتعديل الأصناف - للمدير فقط)
+         ========================================================================== -->
+    <div class="modal-overlay" id="item-modal">
+        <div class="modal-window">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-box-open"></i>
+                    <span id="item-modal-title">إضافة صنف جديد للمخزن</span>
+                </div>
+                <button class="modal-close-btn" onclick="window.app.closeModal('item-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="item-form" onsubmit="event.preventDefault();">
+                <input type="hidden" id="item-id-input">
+                <div class="modal-body">
+                    <div class="form-grid">
+                        <div class="form-group full-width">
+                            <label>اسم الصنف / المنتج *</label>
+                            <input type="text" id="item-name-input" class="form-control"
+                                placeholder="مثال: مشروب طاقة ريد بول" required>
+                        </div>
+                        <div class="form-group">
+                            <label>الباركود (إن وجد)</label>
+                            <input type="text" id="item-barcode-input" class="form-control"
+                                placeholder="امسح الباركود أو اكتبه">
+                        </div>
+                        <div class="form-group">
+                            <label>سعر الشراء / التكلفة (ج.م) *</label>
+                            <input type="number" step="0.5" id="item-buy-price-input" class="form-control"
+                                placeholder="0.00" required>
+                        </div>
+                        <div class="form-group">
+                            <label>سعر البيع للجمهور (ج.م) *</label>
+                            <input type="number" step="0.5" id="item-sell-price-input" class="form-control"
+                                placeholder="0.00" required>
+                        </div>
+                        <div class="form-group">
+                            <label>الكمية الحالية في المخزن *</label>
+                            <input type="number" step="1" id="item-qty-input" class="form-control" value="10" required>
+                        </div>
+                        <div class="form-group">
+                            <label>حد التنبيه (قرب ينفذ) *</label>
+                            <input type="number" step="1" id="item-min-qty-input" class="form-control" value="5"
+                                required>
+                        </div>
+                        <!-- Hidden fields kept for backward compatibility -->
+                        <input type="hidden" id="item-category-input" value="general">
+                        <input type="hidden" id="item-unit-input" value="قطعة">
+                        <input type="hidden" id="item-notes-input" value="">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary"
+                        onclick="window.app.closeModal('item-modal')">إلغاء</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i>
+                        <span>حفظ في المخزن</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==========================================================================
+         MODAL 3: Stock In / Restock Modal (توريد كمية للمخزن)
+         ========================================================================== -->
+    <div class="modal-overlay" id="stockin-modal">
+        <div class="modal-window">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-truck-loading"></i>
+                    <span>توريد بضاعة جديدة للمخزن</span>
+                </div>
+                <button class="modal-close-btn" onclick="window.app.closeModal('stockin-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="stockin-form" onsubmit="event.preventDefault();">
+                <input type="hidden" id="stockin-item-id">
+                <div class="modal-body">
+                    <div
+                        style="background: var(--bg-dark-panel); padding: 12px; border-radius: 6px; border: 1px solid var(--border-color);">
+                        <div>الصنف: <strong id="stockin-item-name" style="color: var(--text-highlight);">--</strong>
+                        </div>
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">الرصيد الحالي
+                            بالمخزن: <strong id="stockin-current-qty" style="color: var(--status-green);">--</strong>
+                        </div>
+                    </div>
+
+                    <div class="form-grid" style="margin-top: 10px;">
+                        <div class="form-group">
+                            <label>الكمية الواردة الجديدة *</label>
+                            <input type="number" id="stockin-add-qty" class="form-control" min="1" step="1" required>
+                        </div>
+                        <div class="form-group">
+                            <label>سعر الشراء الجديد للقطعة (ج.م)</label>
+                            <input type="number" step="0.5" id="stockin-unit-cost" class="form-control">
+                        </div>
+                        <div class="form-group full-width">
+                            <label>اسم المورد / رقم فاتورة المورد (اختياري)</label>
+                            <input type="text" id="stockin-supplier" class="form-control"
+                                placeholder="مثال: شركة النصر للمشروبات">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary"
+                        onclick="window.app.closeModal('stockin-modal')">إلغاء</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-plus"></i>
+                        <span>إضافة للرصيد فوراً</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==========================================================================
+         MODAL 4: Daily Sales & Shift Report Modal (تقرير اليومية والفلوس)
+         ========================================================================== -->
+    <div class="modal-overlay" id="report-modal">
+        <div class="modal-window large">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-receipt"></i>
+                    <span>تقرير مبيعات الوردية واليومية</span>
+                </div>
+                <button class="modal-close-btn" onclick="window.app.closeModal('report-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Navigation Tabs inside Report -->
+                <div class="report-tabs-bar">
+                    <button class="report-tab-btn active" data-tab="active-shift"
+                        onclick="window.reports.setReportTab('active-shift')">
+                        <i class="fas fa-business-time"></i>
+                        <span>الوردية الحالية</span>
+                    </button>
+                    <button class="report-tab-btn admin-only" data-tab="cashier-lookup"
+                        onclick="window.reports.setReportTab('cashier-lookup')">
+                        <i class="fas fa-user-magnify-glass"></i>
+                        <span>بحث عن كاشير</span>
+                    </button>
+                    <button class="report-tab-btn admin-only" data-tab="all-today"
+                        onclick="window.reports.setReportTab('all-today')">
+                        <i class="fas fa-calendar-day"></i>
+                        <span>إجمالي اليوم</span>
+                    </button>
+                    <button class="report-tab-btn" data-tab="history" onclick="window.reports.setReportTab('history')">
+                        <i class="fas fa-archive"></i>
+                        <span>الورديات المقفلة</span>
+                    </button>
+                </div>
+
+                <!-- Cashier Lookup Section -->
+                <div id="report-cashier-lookup-section" style="display:none;">
+                    <div
+                        style="background:var(--bg-dark-panel); border:1px solid var(--border-color); border-radius:8px; padding:14px; margin-bottom:12px;">
+                        <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:10px; align-items:end;">
+                            <div class="form-group" style="margin:0;">
+                                <label style="font-size:12px; color:var(--text-secondary);"><i class="fas fa-user"></i>
+                                    اختر اسم الكاشير</label>
+                                <select id="cashier-lookup-select" class="form-control"
+                                    onchange="window.reports.onCashierLookupChange()">
+                                    <option value="">-- اختر الكاشير --</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin:0;">
+                                <label style="font-size:12px; color:var(--text-secondary);"><i class="fas fa-clock"></i>
+                                    اختر الوردية / الفترة</label>
+                                <select id="cashier-shift-select" class="form-control"
+                                    onchange="window.reports.onCashierShiftChange()">
+                                    <option value="active">الوردية الحالية النشطة</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-primary" style="padding:8px 14px;"
+                                onclick="window.reports.renderCashierLookup()">
+                                <i class="fas fa-search"></i> عرض
+                            </button>
+                        </div>
+                    </div>
+                    <div id="cashier-lookup-results">
+                        <div style="text-align:center; color:var(--text-muted); padding:40px;"><i
+                                class="fas fa-user-clock" style="font-size:32px; margin-bottom:10px; opacity:0.4;"></i>
+                            <p>اختر كاشير لعرض تفاصيل مبيعاته وصافي فلوسه</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 1. Cashier View Section -->
+                <div id="report-cashier-section" style="display: none;">
+                    <div
+                        style="background: var(--bg-dark-panel); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; margin-bottom: 14px;">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <div>
+                                <span style="font-size: 13px; color: var(--text-secondary);">الكاشير: </span>
+                                <strong id="report-cashier-name" style="color: #fff;">--</strong>
+                                <span class="badge badge-success" id="report-cashier-shift-badge"
+                                    style="margin-right: 6px;">وردية #1</span>
+                            </div>
+                            <div>
+                                <span style="font-size: 13px; color: var(--text-secondary);">وقت البدء: </span>
+                                <strong id="report-cashier-date"
+                                    style="color: var(--primary-cyan); font-family: var(--font-mono);">--</strong>
+                            </div>
+                        </div>
+                        <div
+                            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-top: 10px;">
+                            <div
+                                style="background: rgba(0, 230, 118, 0.1); border: 1px solid var(--status-green); padding: 12px; border-radius: 6px; text-align: center;">
+                                <div style="font-size: 12px; color: var(--text-secondary);">إجمالي الفلوس في هذه الوردية
+                                </div>
+                                <div id="report-cashier-total-cash"
+                                    style="font-size: 22px; font-weight: bold; color: var(--status-green); font-family: var(--font-mono); margin-top: 4px;">
+                                    0.00 ج.م</div>
+                            </div>
+                            <div
+                                style="background: var(--bg-dark-secondary); border: 1px solid var(--border-color); padding: 12px; border-radius: 6px; text-align: center;">
+                                <div style="font-size: 12px; color: var(--text-secondary);">عدد الفواتير المنفذة</div>
+                                <div id="report-cashier-count"
+                                    style="font-size: 22px; font-weight: bold; color: #fff; font-family: var(--font-mono); margin-top: 4px;">
+                                    0</div>
+                            </div>
+                            <div
+                                style="background: var(--bg-dark-secondary); border: 1px solid var(--border-color); padding: 12px; border-radius: 6px; text-align: center;">
+                                <div style="font-size: 12px; color: var(--text-secondary);">إجمالي القطع المباعة</div>
+                                <div id="report-cashier-items-count"
+                                    style="font-size: 22px; font-weight: bold; color: var(--primary-cyan); font-family: var(--font-mono); margin-top: 4px;">
+                                    0</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="font-weight: bold; font-size: 14px; margin-bottom: 8px; color: var(--text-highlight);">
+                        <i class="fas fa-list-check"></i> تفاصيل الفواتير المسجلة في هذه الوردية:
+                    </div>
+                    <div
+                        style="max-height: 220px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px;">
+                        <table class="pancafe-table">
+                            <thead>
+                                <tr>
+                                    <th>رقم الفاتورة</th>
+                                    <th>الوقت</th>
+                                    <th>الأصناف</th>
+                                    <th>المبلغ الإجمالي</th>
+                                </tr>
+                            </thead>
+                            <tbody id="report-cashier-invoices-body">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 2. Admin Full View Section (Includes Revenue, Cost, Profit & Top Items) -->
+                <div id="report-admin-section">
+                    <div style="margin-bottom: 8px; font-size: 13px;">
+                        <span>عرض بيانات: </span>
+                        <strong id="report-admin-shift-badge" style="color: var(--primary-cyan);">وردية #1</strong>
+                    </div>
+                    <div
+                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 14px;">
+                        <div
+                            style="background: var(--bg-dark-panel); border: 1px solid var(--border-color); padding: 12px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 12px; color: var(--text-secondary);">إجمالي الإيرادات (دخل كام فلوس)
+                            </div>
+                            <div id="report-admin-revenue"
+                                style="font-size: 20px; font-weight: bold; color: #00d2ff; font-family: var(--font-mono); margin-top: 4px;">
+                                0.00 ج.م</div>
+                        </div>
+                        <div
+                            style="background: var(--bg-dark-panel); border: 1px solid var(--border-color); padding: 12px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 12px; color: var(--text-secondary);">إجمالي التكلفة (صرف كام على
+                                البضاعة)</div>
+                            <div id="report-admin-cost"
+                                style="font-size: 20px; font-weight: bold; color: #ff9100; font-family: var(--font-mono); margin-top: 4px;">
+                                0.00 ج.م</div>
+                        </div>
+                        <div
+                            style="background: rgba(0, 230, 118, 0.1); border: 1px solid var(--status-green); padding: 12px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 12px; color: var(--text-secondary);">صافي الأرباح الفعلية</div>
+                            <div id="report-admin-profit"
+                                style="font-size: 22px; font-weight: bold; color: var(--status-green); font-family: var(--font-mono); margin-top: 4px;">
+                                +0.00 ج.م</div>
+                        </div>
+                        <div
+                            style="background: var(--bg-dark-panel); border: 1px solid var(--border-color); padding: 12px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 12px; color: var(--text-secondary);">عدد الفواتير المنفذة</div>
+                            <div id="report-admin-invoices-count"
+                                style="font-size: 20px; font-weight: bold; color: #fff; font-family: var(--font-mono); margin-top: 4px;">
+                                0</div>
+                        </div>
+                    </div>
+
+                    <!-- Itemized Profit & Cost Table for Admin -->
+                    <div
+                        style="font-weight: bold; font-size: 13px; margin: 12px 0 6px 0; color: var(--text-highlight);">
+                        <i class="fas fa-calculator"></i> جدول تفاصيل أسعار الشراء والبيع وصافي ربح كل صنف بالتفصيل:
+                    </div>
+                    <div
+                        style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; margin-bottom: 14px;">
+                        <table class="pancafe-table">
+                            <thead>
+                                <tr>
+                                    <th>اسم الصنف</th>
+                                    <th>الكمية المباعة</th>
+                                    <th>سعر الشراء (التكلفة)</th>
+                                    <th>سعر البيع</th>
+                                    <th>صافي ربح القطعة</th>
+                                    <th>إجمالي تكلفة البضاعة</th>
+                                    <th>إجمالي البيع</th>
+                                    <th>إجمالي صافي الربح</th>
+                                </tr>
+                            </thead>
+                            <tbody id="report-admin-items-profit-body">
+                                <!-- Populated dynamically by reports.js -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 280px; gap: 14px;">
+                        <!-- Invoices Log Table -->
+                        <div>
+                            <div
+                                style="font-weight: bold; font-size: 13px; margin-bottom: 6px; color: var(--text-highlight);">
+                                <i class="fas fa-history"></i> سجل فواتير الوردية:
+                            </div>
+                            <div
+                                style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px;">
+                                <table class="pancafe-table">
+                                    <thead>
+                                        <tr>
+                                            <th>الفاتورة</th>
+                                            <th>الوقت</th>
+                                            <th>الكاشير</th>
+                                            <th>العميل</th>
+                                            <th>المجموع</th>
+                                            <th>الربح</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="report-admin-invoices-body">
+                                        <!-- Populated dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Top Items Widget -->
+                        <div>
+                            <div
+                                style="font-weight: bold; font-size: 13px; margin-bottom: 6px; color: var(--text-highlight);">
+                                <i class="fas fa-fire"></i> الأكثر مبيعاً:
+                            </div>
+                            <div id="report-admin-top-items"
+                                style="background: var(--bg-dark-panel); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; max-height: 180px; overflow-y: auto;">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Closed Shifts History Section -->
+                <div id="report-history-section" style="display: none;">
+                    <div style="font-weight: bold; font-size: 13px; margin-bottom: 8px; color: var(--text-highlight);">
+                        <i class="fas fa-history"></i> أرشيف الورديات المغلقة السابقة (مسجل بها من قفل وماذا خرج وبكم):
+                    </div>
+                    <div
+                        style="max-height: 280px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px;">
+                        <table class="pancafe-table">
+                            <thead>
+                                <tr>
+                                    <th>رقم الوردية</th>
+                                    <th>التاريخ</th>
+                                    <th>الموظف الذي قفل الوردية</th>
+                                    <th>الفترة الزمنية</th>
+                                    <th>الفواتير</th>
+                                    <th>إجمالي الفلوس</th>
+                                    <th>إجراء</th>
+                                </tr>
+                            </thead>
+                            <tbody id="shifts-history-table-body">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="justify-content: space-between;">
+                <div>
+                    <button class="btn btn-secondary" onclick="window.reports.exportToCSV()">
+                        <i class="fas fa-file-excel" style="color: #27ae60;"></i>
+                        <span>تصدير Excel / CSV</span>
+                    </button>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-warning" onclick="window.reports.openSecureCloseShiftModal()">
+                        <i class="fas fa-shield-alt"></i>
+                        <span>تقفيل الوردية الحالية وتصفير الفلوس (0.00 ج.م)</span>
+                    </button>
+                    <button class="btn btn-secondary" onclick="window.app.closeModal('report-modal')">إغلاق</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================================================
+         MODAL 4.5: Upgraded Modern Shift Dashboard & Statistics Console
+         ========================================================================== -->
+    <div class="modal-overlay" id="secure-close-shift-modal">
+        <div class="modal-window shift-modal-window">
+            <!-- Header -->
+            <div class="shift-modal-header">
+                <div class="shift-header-info">
+                    <div
+                        style="width: 36px; height: 36px; background: rgba(0, 210, 255, 0.15); border: 1px solid rgba(0, 210, 255, 0.4); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-chart-pie" style="color: var(--primary-cyan); font-size: 17px;"></i>
+                    </div>
+                    <div>
+                        <div
+                            style="font-size: 16px; font-weight: bold; color: #fff; display: flex; align-items: center; gap: 8px;">
+                            <span>إحصائيات ومبيعات الشفت وتقفيل الوردية</span>
+                            <span class="shift-live-chip" id="shift-modal-status-chip">
+                                <span class="pulse-dot"></span>
+                                <span id="shift-chip-text">وردية نشطة</span>
+                            </span>
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">
+                            متابعة المبيعات الحية، فلوس الدرج، ما تم بيعه، وأرباح الإدارة
+                        </div>
+                    </div>
+                </div>
+                <button class="modal-close-btn" onclick="window.app.closeModal('secure-close-shift-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Nav Tabs -->
+            <div class="shift-nav-tabs">
+                <button type="button" class="shift-tab-btn active" id="tab-btn-active-shift"
+                    onclick="window.reports.switchShiftModalTab('active-shift')">
+                    <i class="fas fa-chart-pie"></i>
+                    <span>إحصائيات الشفت الحالي</span>
+                </button>
+                <button type="button" class="shift-tab-btn" id="tab-btn-history-shift"
+                    onclick="window.reports.switchShiftModalTab('history-shift')">
+                    <i class="fas fa-history"></i>
+                    <span>الحاجة اللي اتباعت بالشفتات (سجل الورديات)</span>
+                </button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="modal-body" style="padding: 16px; background: #151922;">
+
+                <!-- ================= TAB 1: ACTIVE SHIFT STATS ================= -->
+                <div id="shift-panel-active" style="display: block;">
+                    <!-- Shift Sub-Bar -->
+                    <div class="shift-sub-bar">
+                        <div class="shift-user-badge">
+                            <div class="shift-user-avatar" id="shift-user-avatar">👨‍💼</div>
+                            <div>
+                                <div style="font-size: 14px; font-weight: bold; color: #fff;"
+                                    id="secure-close-cashier-name">--</div>
+                                <div
+                                    style="font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; margin-top: 2px;">
+                                    <span id="shift-user-role-badge" class="badge badge-success">مدير</span>
+                                    <span>•</span>
+                                    <span id="secure-close-shift-num"
+                                        style="color: var(--primary-cyan); font-weight: bold;">وردية #1</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 18px; align-items: center; flex-wrap: wrap;">
+                            <div>
+                                <div style="font-size: 11px; color: var(--text-muted);">بدأت الوردية في:</div>
+                                <div style="font-size: 12px; font-weight: bold; color: #fff;"
+                                    id="shift-modal-start-time">--</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 11px; color: var(--text-muted);">المدة المنقضية:</div>
+                                <div style="font-size: 12px; font-weight: bold; color: var(--status-orange);"
+                                    id="shift-modal-duration">--</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cashier Restricted Info Banner -->
+                    <div id="shift-cashier-notice"
+                        style="display: none; background: rgba(0, 210, 255, 0.08); border: 1px solid rgba(0, 210, 255, 0.25); border-radius: 8px; padding: 8px 14px; margin-bottom: 12px; font-size: 12px; color: var(--text-highlight);">
+                        <i class="fas fa-shield-alt"></i> <strong>وضع الكاشير:</strong> يظهر لك بيان نقدية الدرج
+                        والأصناف التي بيعت لتسليمها للإدارة. بيانات التكلفة وصافي الأرباح مشفرة ومخصصة لحساب المدير فقط.
+                    </div>
+
+                    <!-- Financial Summary Cards -->
+                    <div class="shift-kpi-grid">
+                        <!-- Total Cash in Drawer -->
+                        <div class="shift-kpi-card highlight-cash">
+                            <div class="kpi-label">
+                                <i class="fas fa-money-bill-wave"></i>
+                                <span>توتل الفلوس بالدرج</span>
+                            </div>
+                            <div class="kpi-value" id="secure-close-total-cash">0.00 ج.م</div>
+                            <div class="kpi-sub">إجمالي المبيعات النقدية بالدرج</div>
+                        </div>
+
+                        <!-- Invoices Count -->
+                        <div class="shift-kpi-card">
+                            <div class="kpi-label">
+                                <i class="fas fa-receipt"></i>
+                                <span>فواتير الوردية</span>
+                            </div>
+                            <div class="kpi-value" style="color: var(--primary-cyan);" id="shift-kpi-invoices-count">0
+                            </div>
+                            <div class="kpi-sub">عملية بيع منفذة</div>
+                        </div>
+
+                        <!-- Total Items Sold -->
+                        <div class="shift-kpi-card">
+                            <div class="kpi-label">
+                                <i class="fas fa-boxes-stacked"></i>
+                                <span>القطع المباعة</span>
+                            </div>
+                            <div class="kpi-value" style="color: var(--status-orange);" id="shift-kpi-items-qty">0 قطعة
+                            </div>
+                            <div class="kpi-sub">خرجت من المخزن بالوردية</div>
+                        </div>
+
+                        <!-- ADMIN ONLY: Cost of Goods (اللي اتصرف على البضاعة) -->
+                        <div class="shift-kpi-card admin-cost-card admin-metric-el" id="shift-kpi-cost-card">
+                            <div class="kpi-label">
+                                <i class="fas fa-truck-loading" style="color: var(--status-orange);"></i>
+                                <span style="color: #ffbb33;">ما صُرِف على البضاعة</span>
+                                <span class="admin-tag-badge">مدير</span>
+                            </div>
+                            <div class="kpi-value" style="color: #ffaa00;" id="shift-kpi-total-cost">0.00 ج.م</div>
+                            <div class="kpi-sub">تكلفة جملة البضاعة المباعة</div>
+                        </div>
+
+                        <!-- ADMIN ONLY: Net Profit (صافي ربح الوردية) -->
+                        <div class="shift-kpi-card admin-profit-card admin-metric-el" id="shift-kpi-profit-card">
+                            <div class="kpi-label">
+                                <i class="fas fa-chart-line" style="color: #49ffa0;"></i>
+                                <span style="color: #49ffa0;">صافي ربح الوردية</span>
+                                <span class="admin-tag-badge">مدير</span>
+                            </div>
+                            <div class="kpi-value" id="shift-kpi-net-profit">+0.00 ج.م</div>
+                            <div class="kpi-sub" id="shift-kpi-profit-margin">هامش ربح: 0%</div>
+                        </div>
+                    </div>
+
+                    <!-- Sold Items Breakdown Table -->
+                    <div class="shift-items-panel">
+                        <div class="shift-items-header">
+                            <div
+                                style="font-weight: bold; font-size: 13px; color: var(--text-highlight); display: flex; align-items: center; gap: 8px;">
+                                <i class="fas fa-list-check"></i>
+                                <span>بيان تفصيلي بالحاجة اللي اتباعت في الشفت (طلع إيه وبكام):</span>
+                            </div>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <input type="text" id="shift-active-items-search" class="form-control"
+                                    placeholder="🔍 تصفية الأصناف المباعة..."
+                                    style="font-size: 12px; padding: 4px 10px; width: 220px;"
+                                    oninput="window.reports.filterActiveShiftItems(this.value)">
+                            </div>
+                        </div>
+
+                        <div class="shift-items-table-wrapper">
+                            <table class="pancafe-table">
+                                <thead>
+                                    <tr>
+                                        <th>الصنف</th>
+                                        <th>الكمية المباعة</th>
+                                        <th>سعر البيع</th>
+                                        <th>إجمالي المحصل</th>
+                                        <th class="admin-table-col" style="color: #ffbb33;">سعر الشراء (التكلفة)</th>
+                                        <th class="admin-table-col" style="color: #ffaa00;">إجمالي التكلفة</th>
+                                        <th class="admin-table-col" style="color: #49ffa0;">صافي الربح</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="secure-close-items-table-body">
+                                    <!-- Populated dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Cash Drawer Reconciliation & Audit Console (لوحة مطابقة الخزينة وكشف العجز والأوفر) -->
+                    <div class="shift-audit-console" style="background: #192130; border: 1.5px solid #2d3b52; border-radius: 10px; padding: 14px 16px; margin-bottom: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                            <div style="font-size: 13px; font-weight: bold; color: #fff; display: flex; align-items: center; gap: 8px;">
+                                <i class="fas fa-cash-register" style="color: var(--primary-cyan);"></i>
+                                <span>مطابقة نقدية الخزينة / الدرج (كشف العجز والأوفر بالوردية):</span>
+                            </div>
+                            <span style="font-size: 11px; color: var(--text-muted);">عد فلوسك بالدرج بدقة قبل تأكيد الإقفال</span>
+                        </div>
+
+                        <div class="shift-audit-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 12px;">
+                            <!-- 1. Expected Cash by System -->
+                            <div class="shift-audit-card" style="background: #141923; border: 1px solid #2a3547; border-radius: 8px; padding: 10px 12px;">
+                                <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                                    <i class="fas fa-file-invoice-dollar" style="color: var(--primary-cyan);"></i>
+                                    <span>مبيعات السيستم المفترضة</span>
+                                </div>
+                                <div style="font-size: 18px; font-weight: 800; font-family: var(--font-mono); color: #fff;" id="audit-expected-cash">0.00 ج.م</div>
+                                <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">إجمالي الكاش المسجل بالسيستم</div>
+                            </div>
+
+                            <!-- 2. Actual Counted Cash Input -->
+                            <div class="shift-audit-card" style="background: #141923; border: 1px solid var(--primary-cyan); border-radius: 8px; padding: 10px 12px; box-shadow: 0 0 10px rgba(0, 210, 255, 0.1);">
+                                <div style="font-size: 11px; color: var(--primary-cyan); font-weight: bold; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                                    <i class="fas fa-hand-holding-dollar"></i>
+                                    <span>المبلغ الفعلي المعدود بالدرج *</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <input type="number" step="0.5" min="0" id="shift-actual-cash-input"
+                                        class="form-control" placeholder="اكتب المبلغ الفعلي..."
+                                        oninput="window.reports.onCashCountInputChange(this.value)"
+                                        style="font-family: var(--font-mono); font-size: 16px; font-weight: 800; color: #fff; background: #0e131b; padding: 6px 10px; width: 100%;">
+                                    <span style="font-size: 12px; font-weight: bold; color: var(--primary-cyan);" id="audit-cash-currency">ج.م</span>
+                                </div>
+                                <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">اكتب الفلوس الموجودة أمامك بالدرج</div>
+                            </div>
+
+                            <!-- 3. Shortage Box (خانة العجز) -->
+                            <div class="shift-audit-card" id="audit-shortage-card" style="background: linear-gradient(145deg, #221417 0%, #1a1012 100%); border: 1px solid rgba(255, 61, 113, 0.4); border-radius: 8px; padding: 10px 12px;">
+                                <div style="font-size: 11px; color: var(--status-red); font-weight: bold; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                                    <i class="fas fa-arrow-trend-down"></i>
+                                    <span>العجز في الدرج (Shortage)</span>
+                                </div>
+                                <div style="font-size: 18px; font-weight: 800; font-family: var(--font-mono); color: var(--status-red);" id="audit-shortage-value">0.00 ج.م</div>
+                                <div style="font-size: 10px; color: #ff8fa3;" id="audit-shortage-sub">لا يوجد عجز</div>
+                            </div>
+
+                            <!-- 4. Surplus / Overage Box (خانة الأوفر / الزيادة) -->
+                            <div class="shift-audit-card" id="audit-surplus-card" style="background: linear-gradient(145deg, #102126 0%, #0d191d 100%); border: 1px solid rgba(0, 210, 255, 0.4); border-radius: 8px; padding: 10px 12px;">
+                                <div style="font-size: 11px; color: var(--primary-cyan); font-weight: bold; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                                    <i class="fas fa-arrow-trend-up"></i>
+                                    <span>الأوفر (زيادة بالدرج)</span>
+                                </div>
+                                <div style="font-size: 18px; font-weight: 800; font-family: var(--font-mono); color: var(--primary-cyan);" id="audit-surplus-value">0.00 ج.م</div>
+                                <div style="font-size: 10px; color: #80e5ff;" id="audit-surplus-sub">لا يوجد أوفر</div>
+                            </div>
+                        </div>
+
+                        <!-- Live Status Banner (إشعار فوري بحالة الخزينة) -->
+                        <div id="shift-audit-banner" style="background: rgba(255, 255, 255, 0.04); border: 1px solid #2f3b50; border-radius: 6px; padding: 8px 12px; font-size: 12px; display: flex; align-items: center; gap: 8px; color: var(--text-secondary);">
+                            <i class="fas fa-info-circle" id="shift-audit-banner-icon" style="color: var(--primary-cyan);"></i>
+                            <span id="shift-audit-banner-text">عد فلوس الدرج واكتبها في الخانة أعلاه لمعرفة ما إذا كان هناك عجز أو أوفر.</span>
+                        </div>
+                    </div>
+
+                    <!-- Footer Action Buttons -->
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-top: 14px; border-top: 1px solid #2d3648; flex-wrap: wrap; gap: 10px;">
+                        <div style="display: flex; gap: 8px;">
+                            <button type="button" class="btn btn-secondary"
+                                onclick="window.app.closeModal('secure-close-shift-modal')">
+                                <i class="fas fa-times"></i>
+                                <span>إغلاق ومتابعة البيع</span>
+                            </button>
+                            <button type="button" class="btn btn-secondary"
+                                style="border-color: #384259; color: var(--text-highlight);"
+                                onclick="window.reports.printCurrentShiftPreview()">
+                                <i class="fas fa-print"></i>
+                                <span>طباعة تقرير الشفت</span>
+                            </button>
+                        </div>
+                        <div>
+                            <button type="button" class="btn btn-danger"
+                                style="font-weight: bold; padding: 10px 26px; font-size: 14px; background: linear-gradient(135deg, #e53935 0%, #c62828 100%); border: none; box-shadow: 0 4px 15px rgba(229,57,53,0.35);"
+                                onclick="window.reports.showCloseShiftConfirmation()">
+                                <i class="fas fa-lock"></i>
+                                <span>تقفيل الشفت</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= TAB 2: SHIFTS HISTORY & BREAKDOWN ================= -->
+                <div id="shift-panel-history" style="display: none;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+                        <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 260px;">
+                            <label style="font-size: 13px; font-weight: bold; color: #fff; white-space: nowrap;">
+                                <i class="fas fa-filter" style="color: var(--primary-cyan);"></i> اختر الوردية:
+                            </label>
+                            <select id="shift-history-picker" class="form-control"
+                                style="font-size: 13px; font-weight: bold;"
+                                onchange="window.reports.onHistoryShiftSelected(this.value)">
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+                        <div>
+                            <button type="button" class="btn btn-secondary"
+                                onclick="window.reports.printSelectedHistoryShift()">
+                                <i class="fas fa-print"></i>
+                                <span>طباعة تقرير هذه الوردية</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Past Shift Summary Details -->
+                    <div id="history-shift-details-container">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================================================
+         CONFIRM SHIFT CLOSE MODAL (تأكيد تقفيل الشفت)
+         ========================================================================== -->
+    <div class="modal-overlay" id="confirm-shift-close-modal">
+        <div class="modal-window"
+            style="max-width: 440px; text-align: center; padding: 24px; background: #19202c; border: 1px solid #364259; border-radius: 12px; box-shadow: 0 15px 40px rgba(0,0,0,0.6);">
+            <div
+                style="width: 54px; height: 54px; background: rgba(229, 57, 53, 0.15); border: 2px solid var(--status-red); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px auto; font-size: 26px; color: var(--status-red);">
+                <i class="fas fa-lock"></i>
+            </div>
+            <h3 style="color: #fff; font-size: 18px; margin-bottom: 6px; font-weight: bold;">تأكيد تقفيل الشفت</h3>
+            <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 16px;">
+                سيتم حفظ مبيعات الشفت الحالي في الأرشيف وتصفير نقدية الدرج فوراً إلى 0.00 ج.م
+            </p>
+
+            <!-- Shortage / Overage Warning Banner in Confirmation -->
+            <div id="confirm-close-audit-preview" style="background: #121822; border: 1px solid #2d384c; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; text-align: right; font-size: 13px;">
+                <!-- Populated dynamically by reports.js -->
+            </div>
+
+            <div style="text-align: right; margin-bottom: 18px;">
+                <label
+                    style="font-size: 12px; font-weight: bold; color: var(--status-orange); display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+                    <i class="fas fa-key"></i> تأكيد كلمة المرور للمسؤول:
+                </label>
+                <input type="password" id="confirm-close-password-input" class="form-control"
+                    placeholder="أدخل كلمة المرور لتأكيد التقفيل..." style="font-size: 14px;">
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button type="button" class="btn btn-secondary"
+                    onclick="window.app.closeModal('confirm-shift-close-modal')">إلغاء</button>
+                <button type="button" class="btn btn-danger"
+                    style="font-weight: bold; background: #e53935; border: none; padding: 10px 24px; box-shadow: 0 4px 15px rgba(229,57,53,0.35);"
+                    onclick="window.reports.executeShiftClose()">
+                    <i class="fas fa-check"></i>
+                    <span>نعم، قفل الشفت</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================================================
+         MODAL 5: User Management Modal (إدارة المستخدمين والموظفين - للمدير فقط)
+         ========================================================================== -->
+    <div class="modal-overlay" id="users-modal">
+        <div class="modal-window large">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-users-cog"></i>
+                    <span>إدارة الموظفين واليوزرات والصلاحيات</span>
+                </div>
+                <button class="modal-close-btn" onclick="window.app.closeModal('users-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Add User Form -->
+                <form id="new-user-form" onsubmit="event.preventDefault();"
+                    style="background: var(--bg-dark-panel); padding: 14px; border-radius: 8px; border: 1px solid var(--border-color);">
+                    <div style="font-size: 13px; font-weight: bold; color: var(--primary-cyan); margin-bottom: 10px;">
+                        <i class="fas fa-user-plus"></i> إضافة مستخدم / كاشير جديد للنظام:
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>الاسم بالكامل *</label>
+                            <input type="text" id="user-fullname-input" class="form-control"
+                                placeholder="مثال: محمد سعيد" required>
+                        </div>
+                        <div class="form-group">
+                            <label>اسم المستخدم (Login Username) *</label>
+                            <input type="text" id="user-username-input" class="form-control" placeholder="مثال: mohamed"
+                                required>
+                        </div>
+                        <div class="form-group">
+                            <label>كلمة المرور *</label>
+                            <input type="password" id="user-password-input" class="form-control" placeholder="••••••"
+                                required>
+                        </div>
+                        <div class="form-group">
+                            <label>نوع الحساب والصلاحية *</label>
+                            <select id="user-role-input" class="form-control" required>
+                                <option value="cashier">كاشير / موظف (مبيعات + يومية الوردية فقط)</option>
+                                <option value="admin">مدير عام (تحكم كامل بجميع الميزات)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>رقم الهاتف</label>
+                            <input type="text" id="user-phone-input" class="form-control" placeholder="010xxxxxxxx">
+                        </div>
+                        <div class="form-group">
+                            <label>أيقونة رمزية (Emoji)</label>
+                            <select id="user-avatar-input" class="form-control">
+                                <option value="🧑‍💻">🧑‍💻 كاشير شاب</option>
+                                <option value="👩‍💻">👩‍💻 كاشيرة فتاة</option>
+                                <option value="👨‍💼">👨‍💼 مدير أعمال</option>
+                                <option value="🧑‍💼">🧑‍💼 موظف استقبال</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="text-align: left; margin-top: 12px;">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-plus"></i>
+                            <span>حفظ وإنشاء الحساب</span>
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Users List Table -->
+                <div style="font-weight: bold; font-size: 13px; margin: 12px 0 6px 0; color: var(--text-highlight);">
+                    <i class="fas fa-users"></i> قائمة المستخدمين الحاليين:
+                </div>
+                <div style="border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden;">
+                    <table class="pancafe-table">
+                        <thead>
+                            <tr>
+                                <th>الموظف</th>
+                                <th>اسم الدخول</th>
+                                <th>نوع الحساب والصلاحية</th>
+                                <th>رقم الهاتف</th>
+                                <th>تاريخ الإنشاء</th>
+                                <th>الإجراءات (المرور / الحذف)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table-body">
+                            <!-- Populated dynamically by auth.js -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary"
+                    onclick="window.app.closeModal('users-modal')">إغلاق</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================================================
+         MODAL 5.5: Admin Change User Password Modal (تغيير كلمة مرور المستخدم - للمدير فقط)
+         ========================================================================== -->
+    <div class="modal-overlay" id="change-password-modal">
+        <div class="modal-window" style="max-width: 440px; border: 1px solid rgba(255, 145, 0, 0.4); box-shadow: 0 15px 40px rgba(0,0,0,0.6), 0 0 20px rgba(255,145,0,0.15);">
+            <div class="modal-header" style="background: linear-gradient(135deg, #241d11 0%, #17130b 100%); border-bottom: 1px solid rgba(255, 145, 0, 0.3);">
+                <div class="modal-title" style="color: #ffbb33;">
+                    <i class="fas fa-key"></i>
+                    <span>تغيير كلمة المرور للمستخدم (خاص بالمدير)</span>
+                </div>
+                <button class="modal-close-btn" onclick="window.app.closeModal('change-password-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="admin-change-password-form" onsubmit="event.preventDefault();">
+                <input type="hidden" id="change-pw-user-id">
+                <div class="modal-body">
+                    <!-- Target User Info Banner -->
+                    <div id="change-pw-user-badge" style="background: #141822; border: 1px solid #283347; border-radius: 8px; padding: 12px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px;">
+                        <span id="change-pw-avatar" style="font-size: 28px;">👤</span>
+                        <div style="flex: 1;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <strong id="change-pw-name" style="font-size: 14px; color: #fff;">اسم الموظف</strong>
+                                <span id="change-pw-role" class="role-tag cashier">كاشير</span>
+                            </div>
+                            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
+                                اسم الدخول: <code id="change-pw-username" style="color: var(--primary-cyan); font-weight: bold;">username</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; justify-content: space-between; align-items: center;">
+                            <span><i class="fas fa-lock" style="color: #ffbb33;"></i> كلمة المرور الجديدة *</span>
+                            <span style="font-size: 11px; color: var(--text-muted);">مخفية ومحمية</span>
+                        </label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="change-pw-new-input" class="form-control" placeholder="اكتب كلمة المرور الجديدة..." required minlength="1" autocomplete="new-password">
+                            <button type="button" class="btn-toggle-password" onclick="window.auth.togglePasswordVisibility('change-pw-new-input', this)" title="إظهار / إخفاء">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; justify-content: space-between; align-items: center;">
+                            <span><i class="fas fa-shield-halved" style="color: #ffbb33;"></i> تأكيد كلمة المرور الجديدة *</span>
+                        </label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="change-pw-confirm-input" class="form-control" placeholder="أعد كتابة كلمة المرور للتأكيد..." required minlength="1" autocomplete="new-password">
+                            <button type="button" class="btn-toggle-password" onclick="window.auth.togglePasswordVisibility('change-pw-confirm-input', this)" title="إظهار / إخفاء">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="window.app.closeModal('change-password-modal')">إلغاء</button>
+                    <button type="submit" class="btn btn-warning" style="font-weight: bold; background: #ff9800; border: none; color: #111; padding: 8px 20px;">
+                        <i class="fas fa-check"></i>
+                        <span>حفظ كلمة المرور الجديدة</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==========================================================================
+         MODAL 6: Switch User / Login Modal (قائمة تبديل المستخدمين التفاعلية)
+         ========================================================================== -->
+    <div class="modal-overlay" id="login-modal">
+        <div class="modal-window switch-user-modal-window">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-users-viewfinder"></i>
+                    <span>تبديل المستخدم / الدخول للنظام</span>
+                </div>
+                <button class="modal-close-btn" onclick="window.app.closeModal('login-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="login-form" onsubmit="event.preventDefault();">
+                <input type="hidden" id="login-username" required>
+                <div class="modal-body">
+                    <div style="font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+                        <span><i class="fas fa-hand-pointer" style="color: var(--primary-cyan);"></i> اختر الحساب المطلوب فتحه:</span>
+                        <span style="font-size: 11px; color: var(--text-muted);" id="switch-users-count-hint"></span>
+                    </div>
+
+                    <!-- Interactive User Selection Cards Grid -->
+                    <div class="switch-user-grid" id="switch-user-cards-container">
+                        <!-- Populated dynamically by auth.js -->
+                    </div>
+
+                    <!-- Selected User Feedback Banner -->
+                    <div id="login-selected-preview" class="switch-user-preview-card" style="display: none;">
+                        <div class="preview-avatar" id="login-preview-avatar">👤</div>
+                        <div class="preview-info">
+                            <div class="preview-title" id="login-preview-name">اسم المستخدم</div>
+                            <div class="preview-subtitle" id="login-preview-sub">الصلاحية</div>
+                        </div>
+                        <div class="preview-badge">
+                            <i class="fas fa-check"></i> محدد
+                        </div>
+                    </div>
+
+                    <!-- Password Field for the Chosen User -->
+                    <div class="form-group" style="margin-top: 14px;">
+                        <label style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: bold;">
+                            <span><i class="fas fa-lock" style="color: var(--primary-cyan);"></i> كلمة المرور للحساب المختار:</span>
+                            <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">مشفرة ومحمية</span>
+                        </label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="login-password" class="form-control" placeholder="أدخل كلمة المرور..." required autocomplete="current-password">
+                            <button type="button" class="btn-toggle-password" onclick="window.auth.togglePasswordVisibility('login-password', this)" title="إظهار / إخفاء">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="window.app.closeModal('login-modal')">إلغاء</button>
+                    <button type="submit" class="btn btn-primary" style="padding: 9px 24px;">
+                        <i class="fas fa-sign-in-alt"></i>
+                        <span>تسجيل الدخول للحساب</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==========================================================================
+         MODAL 7: Settings Modal (إعدادات النظام)
+         ========================================================================== -->
+    <div class="modal-overlay" id="settings-modal">
+        <div class="modal-window">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-cog"></i>
+                    <span>إعدادات النظام والمحل</span>
+                </div>
+                <button class="modal-close-btn" onclick="window.app.closeModal('settings-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="settings-form" onsubmit="event.preventDefault();">
+                <div class="modal-body">
+                    <div class="form-grid">
+                        <div class="form-group full-width">
+                            <label>اسم المحل / المخزن</label>
+                            <input type="text" id="setting-store-name" class="form-control"
+                                value="مخازن">
+                        </div>
+                        <div class="form-group">
+                            <label>رمز العملة</label>
+                            <input type="text" id="setting-currency" class="form-control" value="ج.م">
+                        </div>
+                        <div class="form-group full-width">
+                            <label>نص أسفل الفاتورة المطبوعة</label>
+                            <input type="text" id="setting-footer" class="form-control"
+                                value="شكراً لتعاملكم معنا - نظام مخازن">
+                        </div>
+                        <div class="form-group full-width">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" id="setting-sound" checked>
+                                <span>تفعيل المؤثرات الصوتية (صوت الكاشير والتنبيهات)</span>
+                            </label>
+                        </div>
+                        <div class="form-group full-width admin-only"
+                            style="border-top: 1px solid var(--border-color); padding-top: 10px;">
+                            <label style="color: var(--status-red);">إعادة ضبط المصنع (مسح كل البيانات):</label>
+                            <button type="button" class="btn btn-danger" style="margin-top: 4px;"
+                                onclick="if(confirm('تحذير: هل أنت متأكد من مسح كافة البيانات وإعادتها للوضع الافتراضي؟')){window.db.resetAllData(); location.reload();}">
+                                <i class="fas fa-trash"></i> إعادة ضبط البيانات الافتراضية
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary"
+                        onclick="window.app.closeModal('settings-modal')">إلغاء</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i>
+                        <span>حفظ التغييرات</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==========================================================================
+         8. Lock Screen Overlay (قفل الوردية والشاشة بنمط PanCafe Pro)
+         ========================================================================== -->
+    <div class="lock-screen-overlay" id="lock-screen">
+        <div class="lock-card">
+            <div class="lock-avatar" id="lock-user-avatar">👨‍💼</div>
+            <div>
+                <h3 id="lock-user-name" style="margin-bottom: 4px;">المدير العام</h3>
+                <span style="font-size: 12px; color: var(--text-secondary);">النظام مقفل - أدخل كلمة المرور
+                    للمتابعة</span>
+            </div>
+            <form id="lock-form" onsubmit="event.preventDefault();" style="width: 100%;">
+                <div class="form-group">
+                    <input type="password" id="lock-password" class="form-control" placeholder="كلمة المرور..."
+                        style="text-align: center; font-size: 16px;" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 12px;">
+                    <i class="fas fa-unlock"></i>
+                    <span>فتح القفل</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==========================================================================
+         9. Hidden Print Area for Thermal Receipts
+         ========================================================================== -->
+    <div id="receipt-print-area">
+        <!-- Rendered dynamically on print -->
+    </div>
+
+    <!-- JavaScript Files in strict dependency order -->
+    <script src="js/data.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/inventory.js"></script>
+    <script src="js/pos.js"></script>
+    <script src="js/reports.js"></script>
+    <script src="js/app.js"></script>
+</body>
+
+</html>
