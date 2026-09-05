@@ -1,0 +1,34 @@
+{
+  "name": "pancafe-suite",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PanCafe POS & Inventory suite - React + TypeScript SPA with an Express + SQLite API",
+  "workspaces": [
+    "client",
+    "server",
+    "shared"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev -w server",
+    "dev:client": "npm run dev -w client",
+    "dev": "concurrently -k -n API,WEB -c blue,cyan \"npm:dev:server\" \"npm:dev:client\"",
+    "build": "npm run build -w client",
+    "start": "npm run start -w server",
+    "typecheck": "npm run typecheck -ws --if-present",
+    "check:i18n": "tsx tools/check-i18n.ts",
+    "qa": "tsx tools/qa.ts",
+    "db:reset": "npm run db:reset -w server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "puppeteer-core": "^25.10.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true,
+    "esbuild@0.28.2": true,
+    "esbuild@0.25.12": true
+  }
+}
