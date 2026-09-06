@@ -1,0 +1,31 @@
+# dependencies
+node_modules/
+
+# build output
+client/dist/
+server/dist/
+dist/
+
+# database files (generated at runtime)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# logs
+*.log
+npm-debug.log*
+
+# env / local overrides
+.env
+.env.local
+.env.*.local
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# QA screenshots
+qa-shots/
