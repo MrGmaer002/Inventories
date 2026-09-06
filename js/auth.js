@@ -22,6 +22,15 @@ class AuthManager {
             return { success: false, message: 'كلمة المرور غير صحيحة' };
         }
 
+        // Prevent switching to another user if current active shift has unclosed sales
+        const sales = window.db.getSalesForActiveShift();
+        if (this.currentUser && this.currentUser.id !== user.id && sales.length > 0) {
+            return {
+                success: false,
+                message: 'عفواً! مينفعش تبدل الوردية أو المستخدم غير لما تقفل الوردية الحالية وتصفر الدرج أولاً!'
+            };
+        }
+
         this.currentUser = user;
         window.db.setCurrentUser(user);
         this.shiftStartTime = Date.now();
@@ -30,7 +39,7 @@ class AuthManager {
     }
 
     logout() {
-        this.openSwitchUserModal();
+        this.handleSwitchShiftClick();
     }
 
     lockScreen() {
@@ -120,9 +129,75 @@ class AuthManager {
     }
 
     // ==========================================================================
+    // Switch Shift & Switch User Protection
+    // ==========================================================================
+    handleSwitchShiftClick() {
+        const sales = window.db.getSalesForActiveShift();
+        const activeShift = window.db.getActiveShift();
+        const settings = window.db.getSettings();
+        const currency = settings.currency || 'ج.م';
+
+        // If current active shift has unclosed sales, block handover until closed
+        if (sales && sales.length > 0) {
+            const totalCash = sales.reduce((sum, s) => sum + (parseFloat(s.total) || 0), 0);
+            const totalDiscounts = sales.reduce((sum, s) => sum + (parseFloat(s.discount) || 0), 0);
+            const statsContainer = document.getElementById('must-close-shift-stats');
+
+            if (statsContainer) {
+                statsContainer.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; color: var(--text-secondary);">
+                        <span>رقم الوردية الحالية:</span>
+                        <strong style="color: var(--primary-cyan);">وردية #${activeShift ? activeShift.shiftNumber : 1}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; color: var(--text-secondary);">
+                        <span>المسؤول الحالي عن الشيفت:</span>
+                        <strong style="color: #fff;">${this.currentUser ? this.currentUser.fullName : 'المسؤول'}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; color: var(--text-secondary);">
+                        <span>عدد الفواتير المسجلة:</span>
+                        <strong style="color: #ffbb33;">${sales.length} عملية بيع</strong>
+                    </div>
+                    ${totalDiscounts > 0 ? `
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; color: #ff8a80;">
+                            <span>إجمالي الخصومات بالوردية:</span>
+                            <strong>-${totalDiscounts.toFixed(2)} ${currency}</strong>
+                        </div>
+                    ` : ''}
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px dashed #364259; font-size: 14px;">
+                        <span style="font-weight: bold; color: #fff;">إجمالي الفلوس بالدرج والتحويل:</span>
+                        <strong style="color: var(--status-green); font-size: 16px; font-family: var(--font-mono);">${totalCash.toFixed(2)} ${currency}</strong>
+                    </div>
+                `;
+            }
+
+            window.app.openModal('must-close-shift-modal');
+            window.app.playSound('warning');
+            return;
+        }
+
+        // If no sales in active shift, allow user picker directly
+        this.openSwitchUserModal();
+    }
+
+    proceedToCloseShiftFromAlert() {
+        window.app.closeModal('must-close-shift-modal');
+        setTimeout(() => {
+            window.reports.openSecureCloseShiftModal();
+        }, 150);
+    }
+
+    // ==========================================================================
     // Switch User Menu & Picker Modal
     // ==========================================================================
-    openSwitchUserModal(targetUserId = null) {
+    openSwitchUserModal(targetUserId = null, bypassShiftCheck = false) {
+        if (!bypassShiftCheck) {
+            const sales = window.db.getSalesForActiveShift();
+            if (sales && sales.length > 0) {
+                this.handleSwitchShiftClick();
+                return;
+            }
+        }
+
         const users = window.db.getUsers();
         const container = document.getElementById('switch-user-cards-container');
         const hintEl = document.getElementById('switch-users-count-hint');

@@ -36,15 +36,15 @@
 
         <div class="window-user-info">
             <div class="user-badge" id="top-user-badge" style="cursor: pointer;"
-                onclick="window.auth.openSwitchUserModal()" title="انقر لتبديل المستخدم الحالي">
+                onclick="window.auth.handleSwitchShiftClick()" title="انقر لتبديل الوردية / المستخدم الحالي">
                 <span id="current-user-avatar">👨‍💼</span>
                 <strong id="current-user-name">المدير العام</strong>
                 <span class="role-tag admin" id="current-user-role">المدير العام</span>
             </div>
 
             <div class="window-controls">
-                <button class="win-btn" title="تبديل المستخدم / تسجيل خروج"
-                    onclick="window.auth.openSwitchUserModal()">
+                <button class="win-btn" title="تبديل الوردية / تسليم موظف"
+                    onclick="window.auth.handleSwitchShiftClick()">
                     <i class="fas fa-right-left"></i>
                 </button>
                 <button class="win-btn" title="قفل الشاشة" onclick="window.auth.lockScreen()">
@@ -88,6 +88,14 @@
                 id="btn-close-shift-top" onclick="window.reports.openSecureCloseShiftModal()">
                 <i class="fas fa-chart-pie" style="color: var(--primary-cyan);"></i>
                 <span>إحصائيات وتقفيل الشفت</span>
+            </button>
+
+            <!-- Switch Shift / Handover Button -->
+            <button class="toolbar-btn"
+                style="border-color: #ffaa00; color: #ffbb33; background: rgba(255, 170, 0, 0.08);"
+                id="btn-switch-shift-top" onclick="window.auth.handleSwitchShiftClick()" title="تسليم وتبديل الوردية لموظف آخر">
+                <i class="fas fa-right-left" style="color: #ffaa00;"></i>
+                <span>تبديل الوردية</span>
             </button>
         </div>
 
@@ -177,10 +185,15 @@
 
             <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
                 <button class="btn btn-primary"
-                    style="font-size:15px; padding:12px 28px; font-weight:bold; background:linear-gradient(135deg, #0084ff 0%, #00d2ff 100%); border:none; box-shadow:0 4px 15px rgba(0,210,255,0.3);"
+                    style="font-size:15px; padding:12px 26px; font-weight:bold; background:linear-gradient(135deg, #0084ff 0%, #00d2ff 100%); border:none; box-shadow:0 4px 15px rgba(0,210,255,0.3);"
                     onclick="window.reports.openNewShift()">
                     <i class="fas fa-play"></i>
                     <span>نعم، بدء شفت جديد والبيع الآن</span>
+                </button>
+                <button class="btn btn-warning" style="font-size:14px; padding:12px 20px; font-weight: bold; background: rgba(255, 170, 0, 0.15); border: 1px solid #ffaa00; color: #ffbb33;"
+                    onclick="window.reports.switchShiftAfterClose()">
+                    <i class="fas fa-right-left"></i>
+                    <span>تبديل الوردية / تسليم موظف آخر</span>
                 </button>
                 <button class="btn btn-secondary" style="font-size:14px; padding:12px 20px;"
                     onclick="window.reports.printLastClosedShift()">
@@ -288,24 +301,42 @@
                             <div class="form-group">
                                 <label>خصم إضافي (ج.م)</label>
                                 <input type="number" id="pos-discount-input" class="form-control" value="0" min="0"
-                                    step="1">
+                                    step="1" oninput="window.pos.onDiscountInputChange(this.value)">
                             </div>
                         </div>
 
-                        <!-- Cash Received & Change Calculator -->
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                            <div class="form-group">
-                                <label>المبلغ المستلم من العميل</label>
-                                <input type="number" id="pos-paid-input" class="form-control"
-                                    placeholder="المبلغ المدفوع">
-                            </div>
-                            <div class="form-group">
-                                <label>الباقي للعميل</label>
-                                <div id="pos-cart-change"
-                                    style="font-family: var(--font-mono); font-size: 14px; font-weight: bold; color: var(--primary-cyan); padding-top: 6px;">
-                                    0.00 ج.م
-                                </div>
-                            </div>
+                        <!-- Optional Discount Reason (Appears if discount > 0) -->
+                        <div class="form-group" id="pos-discount-reason-group" style="display: none; margin-top: -2px;">
+                            <label style="font-size: 11px; color: #ff8a80;">
+                                <i class="fas fa-tag"></i> سبب / ملاحظة الخصم (للتوثيق مع تقفيل الوردية)
+                            </label>
+                            <input type="text" id="pos-discount-reason-input" class="form-control"
+                                placeholder="اكتب سبب الخصم (مثال: خصم خاص، ضيافة، عيب بالعبوة)..."
+                                style="border-color: rgba(255, 118, 117, 0.5); font-size: 12px;">
+                        </div>
+
+                        <!-- Payment Method Selection -->
+                        <div class="form-group" style="margin-top: 4px;">
+                            <label style="display: flex; align-items: center; gap: 5px; font-weight: bold; color: #fff;">
+                                <i class="fas fa-credit-card" style="color: var(--primary-cyan);"></i> طريقة الدفع
+                            </label>
+                            <select id="pos-payment-method" class="form-control"
+                                style="font-weight: bold; border-color: var(--primary-cyan);"
+                                onchange="window.pos.onPaymentMethodChange(this.value)">
+                                <option value="cash">💵 كاش (نقدي)</option>
+                                <option value="transfer">📱 تحويل (فودافون كاش / إنستاباي)</option>
+                            </select>
+                        </div>
+
+                        <!-- Customer Phone Field (Appears in place of received/change when transfer is chosen) -->
+                        <div class="form-group" id="pos-phone-group" style="display: none; margin-top: 2px;">
+                            <label style="display: flex; align-items: center; justify-content: space-between; font-weight: bold; color: #ffbb33;">
+                                <span><i class="fas fa-phone-volume"></i> رقم تليفون العميل</span>
+                                <span style="color: var(--status-red); font-size: 11px; font-weight: bold;">* مطلوب للتحويل</span>
+                            </label>
+                            <input type="tel" id="pos-phone-input" class="form-control"
+                                placeholder="سجل رقم تليفون العميل (مثال: 01012345678)..."
+                                style="border: 1.5px solid #ffaa00; background: rgba(255, 170, 0, 0.08); font-family: var(--font-mono); font-weight: bold; color: #fff; font-size: 14px;">
                         </div>
 
                         <!-- Cart Totals Summary -->
@@ -884,6 +915,28 @@
                             <div class="kpi-value" id="shift-kpi-net-profit">+0.00 ج.م</div>
                             <div class="kpi-sub" id="shift-kpi-profit-margin">هامش ربح: 0%</div>
                         </div>
+
+                        <!-- Total Discounts in Shift (الخصومات بالوردية) -->
+                        <div class="shift-kpi-card" id="shift-kpi-discounts-card" style="border-color: rgba(255, 118, 117, 0.35);">
+                            <div class="kpi-label">
+                                <i class="fas fa-tag" style="color: #ff7675;"></i>
+                                <span style="color: #ff7675;">إجمالي الخصومات</span>
+                            </div>
+                            <div class="kpi-value" style="color: #ff7675;" id="shift-kpi-total-discounts">0.00 ج.م</div>
+                            <div class="kpi-sub" id="shift-kpi-discounts-sub">خصومات ممنوحة بالوردية</div>
+                        </div>
+
+                        <!-- Payment Methods Breakdown (كاش / تحويل) -->
+                        <div class="shift-kpi-card" id="shift-kpi-payments-card" style="border-color: rgba(0, 210, 255, 0.35);">
+                            <div class="kpi-label">
+                                <i class="fas fa-wallet" style="color: #00d2ff;"></i>
+                                <span style="color: #7ce8ff;">كاش وتحويلات</span>
+                            </div>
+                            <div class="kpi-value" style="font-size: 13px; font-weight: bold; color: #fff;" id="shift-kpi-payments-breakdown">
+                                كاش: 0.00 | تحويل: 0.00
+                            </div>
+                            <div class="kpi-sub">توزيع طرق الدفع بالوردية</div>
+                        </div>
                     </div>
 
                     <!-- Sold Items Breakdown Table -->
@@ -1003,7 +1056,13 @@
                                 <span>طباعة تقرير الشفت</span>
                             </button>
                         </div>
-                        <div>
+                        <div style="display: flex; gap: 8px;">
+                            <button type="button" class="btn btn-warning"
+                                style="font-weight: bold; padding: 10px 18px; font-size: 13px; background: rgba(255, 170, 0, 0.15); border: 1px solid #ffaa00; color: #ffbb33;"
+                                onclick="window.auth.handleSwitchShiftClick()" title="تسليم الوردية لموظف آخر">
+                                <i class="fas fa-right-left"></i>
+                                <span>تبديل الوردية</span>
+                            </button>
                             <button type="button" class="btn btn-danger"
                                 style="font-weight: bold; padding: 10px 26px; font-size: 14px; background: linear-gradient(135deg, #e53935 0%, #c62828 100%); border: none; box-shadow: 0 4px 15px rgba(229,57,53,0.35);"
                                 onclick="window.reports.showCloseShiftConfirmation()">
@@ -1084,6 +1143,43 @@
                     onclick="window.reports.executeShiftClose()">
                     <i class="fas fa-check"></i>
                     <span>نعم، قفل الشفت</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================================================
+         CANNOT SWITCH SHIFT MODAL - يمنع تبديل الوردية إلا بعد تقفيل الحالية
+         ========================================================================== -->
+    <div class="modal-overlay" id="must-close-shift-modal">
+        <div class="modal-window"
+            style="max-width: 490px; text-align: center; padding: 26px; background: #19202c; border: 1.5px solid #ff9900; border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,0.85);">
+            <div
+                style="width: 64px; height: 64px; background: rgba(255, 153, 0, 0.15); border: 2px solid #ffaa00; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-size: 30px; color: #ffbb33;">
+                <i class="fas fa-triangle-exclamation"></i>
+            </div>
+            <h2 style="color: #fff; font-size: 20px; margin-bottom: 8px; font-weight: bold;">
+                تنبيه: لا يمكن تبديل الوردية الآن!
+            </h2>
+            <p style="color: #cbd5e1; font-size: 14px; line-height: 1.6; margin-bottom: 16px;">
+                مينفعش تبدل الوردية أو المستخدم غير لما تقفل الوردية الحالية وتصفر الدرج لتسليم الحسابات.
+            </p>
+
+            <div id="must-close-shift-stats"
+                style="background: #121822; border: 1px solid #2d384c; border-radius: 10px; padding: 14px; margin-bottom: 20px; text-align: right; font-size: 13px;">
+                <!-- Populated dynamically by auth.js -->
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                <button type="button" class="btn btn-warning"
+                    style="font-size: 14px; font-weight: bold; padding: 11px 24px; background: linear-gradient(135deg, #ff9900 0%, #ff5500 100%); border: none; box-shadow: 0 4px 15px rgba(255,153,0,0.35);"
+                    onclick="window.auth.proceedToCloseShiftFromAlert()">
+                    <i class="fas fa-lock"></i>
+                    <span>تقفيل الوردية الحالية الآن</span>
+                </button>
+                <button type="button" class="btn btn-secondary" style="font-size: 14px; padding: 11px 20px;"
+                    onclick="window.app.closeModal('must-close-shift-modal')">
+                    إلغاء
                 </button>
             </div>
         </div>

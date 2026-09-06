@@ -43,11 +43,30 @@ window.DEFAULT_CATEGORIES = DEFAULT_CATEGORIES;
 // Initial Seed Items (فارغ تماماً لبدء مخزن جديد ونظيف بدون بيانات وهمية)
 const DEFAULT_ITEMS = [];
 
-// Helper to get today's date formatted YYYY-MM-DD
-function getTodayDateString() {
-    const d = new Date();
-    return d.toISOString().split('T')[0];
+// Helper to get local date formatted YYYY-MM-DD
+function getTodayDateString(date = new Date()) {
+    const d = (date instanceof Date && !isNaN(date)) ? date : new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
+
+// Helper to format 12-hour time strictly with ص / م
+function formatTime12H(date = new Date(), withSeconds = false) {
+    const d = (date instanceof Date && !isNaN(date)) ? date : new Date(date);
+    let hours = d.getHours();
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const seconds = String(d.getSeconds()).padStart(2, '0');
+    const period = hours >= 12 ? 'م' : 'ص';
+    const hours12 = String(hours % 12 || 12).padStart(2, '0');
+    if (withSeconds) {
+        return `${hours12}:${minutes}:${seconds} ${period}`;
+    }
+    return `${hours12}:${minutes} ${period}`;
+}
+window.getTodayDateString = getTodayDateString;
+window.formatTime12H = formatTime12H;
 
 // Generate Initial Sales (يبدأ فارغ تماماً بدون مبيعات تجريبية)
 function generateInitialSales() {
@@ -295,8 +314,8 @@ class DataStore {
             shiftNumber: nextShiftNum,
             status: 'active',
             startTime: Date.now(),
-            startDate: getTodayDateString(),
-            startTimeFormatted: d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: true }),
+            startDate: getTodayDateString(d),
+            startTimeFormatted: formatTime12H(d),
             cashierId: currentUser.id,
             cashierName: currentUser.fullName,
             initialCash: parseFloat(initialCash) || 0
@@ -364,6 +383,34 @@ class DataStore {
             });
         });
 
+        // Financial and Payment calculations
+        let totalDiscounts = 0;
+        let cashSales = 0;
+        let transferSales = 0;
+        const discountedSales = [];
+
+        sales.forEach(s => {
+            const saleTotal = parseFloat(s.total) || 0;
+            const saleDiscount = parseFloat(s.discount) || 0;
+            totalDiscounts += saleDiscount;
+
+            if (saleDiscount > 0) {
+                discountedSales.push({
+                    id: s.id,
+                    customer: s.customer || 'عميل نقدي',
+                    discount: saleDiscount,
+                    reason: s.discountReason || '',
+                    total: saleTotal
+                });
+            }
+
+            if (s.paymentMethod === 'transfer') {
+                transferSales += saleTotal;
+            } else {
+                cashSales += saleTotal;
+            }
+        });
+
         const currentUser = this.getCurrentUser();
         const actualCashVal = (auditData && auditData.actualCash !== undefined && auditData.actualCash !== null)
             ? parseFloat(auditData.actualCash)
@@ -376,10 +423,15 @@ class DataStore {
             ...activeShift,
             status: 'closed',
             endTime: Date.now(),
-            endDate: getTodayDateString(),
-            endTimeFormatted: d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: true }),
+            endDate: getTodayDateString(d),
+            endTimeFormatted: formatTime12H(d),
             totalSalesCash: totalCash,
             expectedCash: totalCash,
+            cashSales: cashSales,
+            transferSales: transferSales,
+            totalDiscounts: totalDiscounts,
+            discountedSales: discountedSales,
+            discountedInvoicesCount: discountedSales.length,
             actualCash: actualCashVal,
             shortage: shortageVal,
             surplus: surplusVal,
@@ -444,13 +496,9 @@ class DataStore {
         sale.id = nextId;
         sale.shiftId = activeShift.id;
         sale.timestamp = Date.now();
-        sale.date = getTodayDateString();
         const d = new Date();
-        const hours = d.getHours();
-        const minutes = d.getMinutes().toString().padStart(2, '0');
-        const period = hours >= 12 ? 'م' : 'ص';
-        const formattedHours = (hours % 12 || 12).toString().padStart(2, '0');
-        sale.time = `${formattedHours}:${minutes} ${period}`;
+        sale.date = getTodayDateString(d);
+        sale.time = formatTime12H(d);
         
         // Deduct inventory quantities
         sale.items.forEach(soldItem => {

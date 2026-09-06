@@ -240,14 +240,30 @@ class ReportsManager {
             if (salesList.length === 0) {
                 tableBody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding: 24px;">لا توجد مبيعات في هذه الوردية حتى الآن</td></tr>`;
             } else {
-                tableBody.innerHTML = salesList.map(s => `
+                tableBody.innerHTML = salesList.map(s => {
+                    const isTransfer = s.paymentMethod === 'transfer';
+                    return `
                     <tr>
-                        <td><strong>${s.id}</strong></td>
-                        <td>${s.time}</td>
-                        <td>${s.items.map(it => `${it.name} (${it.qty})`).join(', ')}</td>
-                        <td><strong style="color:var(--status-green);">${parseFloat(s.total).toFixed(2)} ${currency}</strong></td>
+                        <td>
+                            <strong>${s.id}</strong>
+                            <div style="font-size:10px; color:var(--text-muted);">${s.customer || 'عميل نقدي'}</div>
+                        </td>
+                        <td>
+                            <div>${s.time}</div>
+                            <span class="badge ${isTransfer ? 'badge-info' : 'badge-success'}" style="font-size:10px; padding:2px 5px; margin-top:2px;">
+                                ${isTransfer ? `📱 تحويل (${s.transferPhone || '-'})` : '💵 كاش'}
+                            </span>
+                        </td>
+                        <td>
+                            <div>${s.items.map(it => `${it.name} (${it.qty})`).join(', ')}</div>
+                            ${s.discount > 0 ? `<div style="font-size:10px; color:#ff7675;">خصم: -${parseFloat(s.discount).toFixed(2)} ${s.discountReason ? `(${s.discountReason})` : ''}</div>` : ''}
+                        </td>
+                        <td>
+                            <strong style="color:var(--status-green); font-family:var(--font-mono);">${parseFloat(s.total).toFixed(2)} ${currency}</strong>
+                        </td>
                     </tr>
-                `).join('');
+                `;
+                }).join('');
             }
         }
     }
@@ -382,11 +398,25 @@ class ReportsManager {
             const totalCash = sales.reduce((sum, s) => sum + (parseFloat(s.total) || 0), 0);
             const totalInvoices = sales.length;
 
+            let totalDiscounts = 0;
+            let cashSales = 0;
+            let transferSales = 0;
+
             let totalCost = 0;
             let totalItemsQty = 0;
             const itemsMap = {};
 
             sales.forEach(s => {
+                const sTotal = parseFloat(s.total) || 0;
+                const sDisc = parseFloat(s.discount) || 0;
+                totalDiscounts += sDisc;
+
+                if (s.paymentMethod === 'transfer') {
+                    transferSales += sTotal;
+                } else {
+                    cashSales += sTotal;
+                }
+
                 s.items.forEach(it => {
                     const buyCost = parseFloat(it.buyPrice) || 0;
                     const sellPrice = parseFloat(it.price) || 0;
@@ -425,6 +455,9 @@ class ReportsManager {
                 shift: activeShift,
                 sales,
                 totalCash,
+                cashSales,
+                transferSales,
+                totalDiscounts,
                 totalInvoices,
                 totalItemsQty,
                 totalCost,
@@ -465,12 +498,24 @@ class ReportsManager {
             const cashierNoticeEl = document.getElementById('shift-cashier-notice');
             const auditExpectedCashEl = document.getElementById('audit-expected-cash');
             const auditCurrencyEl = document.getElementById('audit-cash-currency');
+            const discountsEl = document.getElementById('shift-kpi-total-discounts');
+            const discountsSubEl = document.getElementById('shift-kpi-discounts-sub');
+            const paymentsEl = document.getElementById('shift-kpi-payments-breakdown');
 
             if (totalCashEl) totalCashEl.textContent = `${totalCash.toFixed(2)} ${currency}`;
             if (auditExpectedCashEl) auditExpectedCashEl.textContent = `${totalCash.toFixed(2)} ${currency}`;
             if (auditCurrencyEl) auditCurrencyEl.textContent = currency;
             if (invoicesEl) invoicesEl.textContent = `${totalInvoices} عملية`;
             if (itemsQtyEl) itemsQtyEl.textContent = `${totalItemsQty} قطعة`;
+
+            if (discountsEl) discountsEl.textContent = `${totalDiscounts.toFixed(2)} ${currency}`;
+            if (discountsSubEl) {
+                const discCount = sales.filter(s => (parseFloat(s.discount) || 0) > 0).length;
+                discountsSubEl.textContent = discCount > 0 ? `${discCount} فواتير بها خصم` : 'لا توجد خصومات';
+            }
+            if (paymentsEl) {
+                paymentsEl.textContent = `كاش: ${cashSales.toFixed(2)} | تحويل: ${transferSales.toFixed(2)}`;
+            }
 
             // 4. Role Permissions: Admin vs Cashier Display
             const adminMetricCards = document.querySelectorAll('.admin-metric-el');
@@ -820,12 +865,19 @@ class ReportsManager {
 
         let options = '';
         if (activeShift) {
-            options += `<option value="${activeShift.id}">🔴 [الوردية الحالية النشطة] - وردية #${activeShift.shiftNumber || 1} (${activeShift.startDate || ''})</option>`;
+            const actStart = activeShift.startTimeFormatted || (activeShift.startTime ? window.formatTime12H(new Date(activeShift.startTime)) : '');
+            options += `<option value="${activeShift.id}">[الوردية النشطة حالياً] - وردية #${activeShift.shiftNumber || 1} | تاريخ: ${activeShift.startDate || ''} (من ${actStart})</option>`;
         }
 
         history.forEach(sh => {
             if (sh && sh.id) {
-                options += `<option value="${sh.id}">وردية #${sh.shiftNumber || 1} - ${sh.startDate || ''} (قفلها: ${sh.closedBy || sh.cashierName || 'المسؤول'})</option>`;
+                const sDate = sh.startDate || '';
+                const eDate = sh.endDate || sDate;
+                const dateDisplay = (sDate && eDate && sDate !== eDate) ? `${sDate} إلى ${eDate}` : sDate;
+                const sTime = sh.startTimeFormatted || (sh.startTime ? window.formatTime12H(new Date(sh.startTime)) : '');
+                const eTime = sh.endTimeFormatted || (sh.endTime ? window.formatTime12H(new Date(sh.endTime)) : 'مستمرة');
+                const cashierLabel = sh.closedBy || sh.cashierName || 'المسؤول';
+                options += `<option value="${sh.id}">وردية #${sh.shiftNumber || 1} | ${dateDisplay} (من ${sTime} إلى ${eTime}) - ${cashierLabel}</option>`;
             }
         });
 
@@ -873,6 +925,12 @@ class ReportsManager {
         const netProfit = targetShift.netProfit !== undefined ? parseFloat(targetShift.netProfit) : (totalCash - totalCost);
         const margin = totalCash > 0 ? ((netProfit / totalCash) * 100).toFixed(1) : '0';
 
+        const sDate = targetShift.startDate || '';
+        const eDate = targetShift.endDate || sDate;
+        const dateDisplay = (sDate && eDate && sDate !== eDate) ? `${sDate} إلى ${eDate}` : sDate;
+        const sTime = targetShift.startTimeFormatted || (targetShift.startTime ? window.formatTime12H(new Date(targetShift.startTime)) : '');
+        const eTime = targetShift.endTimeFormatted || (targetShift.endTime ? window.formatTime12H(new Date(targetShift.endTime)) : (isCurrentActive ? 'مستمرة الآن' : 'غير محدد'));
+
         container.innerHTML = `
             <!-- Shift Header Banner -->
             <div class="shift-sub-bar" style="margin-bottom:12px;">
@@ -882,7 +940,7 @@ class ReportsManager {
                         ${isCurrentActive ? '<span class="badge badge-success">النشطة حالياً</span>' : '<span class="badge badge-secondary">مغلقة ومؤرشفة</span>'}
                     </div>
                     <div style="font-size:11px; color:var(--text-secondary); margin-top:2px;">
-                        التاريخ: <strong>${targetShift.startDate}</strong> | التوقيت: <strong>${targetShift.startTimeFormatted || ''}</strong> إلى <strong>${targetShift.endTimeFormatted || 'مستمرة'}</strong>
+                        التاريخ: <strong>${dateDisplay}</strong> | التوقيت: <strong>${sTime}</strong> إلى <strong>${eTime}</strong>
                     </div>
                 </div>
                 <div style="text-align:left;">
@@ -1248,6 +1306,10 @@ class ReportsManager {
             const surplus = parseFloat(closedShift.surplus) || 0;
             const actualCash = closedShift.actualCash !== undefined ? parseFloat(closedShift.actualCash) : totalCash;
 
+            const discounts = parseFloat(closedShift.totalDiscounts) || 0;
+            const transferSales = parseFloat(closedShift.transferSales) || 0;
+            const cashSales = parseFloat(closedShift.cashSales) || (totalCash - transferSales);
+
             summaryDiv.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid #364157;">
                     <div>
@@ -1261,6 +1323,24 @@ class ReportsManager {
                         <div style="font-size:10px; color:var(--text-muted);">مبيعات السيستم: ${totalCash.toFixed(2)} ${currency}</div>
                     </div>
                 </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; padding:8px 12px; background:rgba(0,210,255,0.06); border:1px solid rgba(0,210,255,0.2); border-radius:6px; font-size:12px;">
+                    <div>
+                        <span style="color:var(--text-secondary);">كاش بالدرج: </span>
+                        <strong style="color:#7ce8ff; font-family:var(--font-mono);">${cashSales.toFixed(2)} ${currency}</strong>
+                    </div>
+                    <div>
+                        <span style="color:var(--text-secondary);">تحويل إلكتروني: </span>
+                        <strong style="color:#49ffa0; font-family:var(--font-mono);">${transferSales.toFixed(2)} ${currency}</strong>
+                    </div>
+                </div>
+
+                ${discounts > 0 ? `
+                    <div style="background:rgba(255,118,117,0.12); border:1px solid rgba(255,118,117,0.3); border-radius:6px; padding:6px 10px; margin-bottom:10px; font-size:12px; display:flex; justify-content:space-between; align-items:center;">
+                        <span style="color:#ff8a80;"><i class="fas fa-tag"></i> إجمالي الخصومات الممنوحة بالوردية:</span>
+                        <strong style="color:#ff7675; font-family:var(--font-mono); font-weight:bold;">-${discounts.toFixed(2)} ${currency}</strong>
+                    </div>
+                ` : ''}
 
                 <!-- Shortage / Overage Reconciliation Status Banner -->
                 ${shortage > 0 ? `
@@ -1361,6 +1441,15 @@ class ReportsManager {
         window.app.showToast('تم بدء شفت جديد بنجاح! تم تصفير الدرج والبدء من 0.00 ج.م وجاهز للبيع.', 'success');
     }
 
+    switchShiftAfterClose() {
+        const overlay = document.getElementById('shift-locked-overlay');
+        if (overlay) overlay.style.display = 'none';
+
+        window.pos.updateStatusBarTotals();
+        window.inventory.render();
+        window.auth.openSwitchUserModal(null, true);
+    }
+
     // =====================================================================
     // Shifts History Table
     // =====================================================================
@@ -1375,17 +1464,23 @@ class ReportsManager {
             return;
         }
 
-        container.innerHTML = history.map(sh => `
+        container.innerHTML = history.map(sh => {
+            const sDate = sh.startDate || '';
+            const eDate = sh.endDate || sDate;
+            const dateDisplay = (sDate && eDate && sDate !== eDate) ? `${sDate} إلى ${eDate}` : sDate;
+            const sTime = sh.startTimeFormatted || (sh.startTime ? window.formatTime12H(new Date(sh.startTime)) : '');
+            const eTime = sh.endTimeFormatted || (sh.endTime ? window.formatTime12H(new Date(sh.endTime)) : 'مستمرة');
+            return `
             <tr>
                 <td><strong>وردية #${sh.shiftNumber}</strong></td>
-                <td>${sh.startDate}</td>
+                <td>${dateDisplay}</td>
                 <td><span class="badge badge-success">${sh.closedBy || sh.cashierName}</span></td>
-                <td>${sh.startTimeFormatted || ''} إلى ${sh.endTimeFormatted || ''}</td>
+                <td>${sTime} إلى ${eTime}</td>
                 <td><strong>${sh.totalInvoices || 0} فاتورة</strong></td>
                 <td>
                     <strong style="color:var(--status-green); font-family:var(--font-mono);">${(parseFloat(sh.totalSalesCash) || 0).toFixed(2)} ${currency}</strong>
-                    ${sh.shortage > 0 ? `<div style="font-size:10px; color:var(--status-red); font-weight:bold; margin-top:2px;"><i class="fas fa-arrow-down"></i> عجز: -${parseFloat(sh.shortage).toFixed(2)}</div>` : ''}
-                    ${sh.surplus > 0 ? `<div style="font-size:10px; color:var(--primary-cyan); font-weight:bold; margin-top:2px;"><i class="fas fa-arrow-up"></i> أوفر: +${parseFloat(sh.surplus).toFixed(2)}</div>` : ''}
+                    ${sh.shortage > 0 ? `<div style="font-size:10px; color:var(--status-red); font-weight:bold; margin-top:2px;">عجز: -${parseFloat(sh.shortage).toFixed(2)}</div>` : ''}
+                    ${sh.surplus > 0 ? `<div style="font-size:10px; color:var(--primary-cyan); font-weight:bold; margin-top:2px;">أوفر: +${parseFloat(sh.surplus).toFixed(2)}</div>` : ''}
                 </td>
                 <td>
                     <button class="btn btn-secondary" style="padding:3px 8px; font-size:11px;" onclick="window.reports.printClosedShiftSummary('${sh.id}')">
@@ -1393,7 +1488,8 @@ class ReportsManager {
                     </button>
                 </td>
             </tr>
-        `).join('');
+        `;
+        }).join('');
     }
 
     printShiftClosureReceipt(closedShift) {
@@ -1408,11 +1504,17 @@ class ReportsManager {
         const totalCost = parseFloat(closedShift.totalCost) || 0;
         const netProfit = closedShift.netProfit !== undefined ? parseFloat(closedShift.netProfit) : (totalCash - totalCost);
 
+        const sDate = closedShift.startDate || '';
+        const eDate = closedShift.endDate || sDate;
+        const dateDisplay = (sDate && eDate && sDate !== eDate) ? `${sDate} إلى ${eDate}` : sDate;
+        const sTime = closedShift.startTimeFormatted || (closedShift.startTime ? window.formatTime12H(new Date(closedShift.startTime)) : '');
+        const eTime = closedShift.endTimeFormatted || (closedShift.endTime ? window.formatTime12H(new Date(closedShift.endTime)) : 'مستمرة');
+
         printArea.innerHTML = `
             <div class="receipt-header">
                 <h3 style="margin:0; font-size:16px;">${settings.storeName || 'مخازن'}</h3>
                 <div style="font-size:13px; font-weight:bold; margin:6px 0; border:1px solid #000; padding:4px;">تقرير إقفال وتسليم وردية #${closedShift.shiftNumber}</div>
-                <div style="font-size:10px;">التاريخ: ${closedShift.startDate} | ${closedShift.startTimeFormatted || ''} إلى ${closedShift.endTimeFormatted || ''}</div>
+                <div style="font-size:10px;">التاريخ: ${dateDisplay} | ${sTime} إلى ${eTime}</div>
                 <div style="font-size:10px;">المسؤول عن التقفيل: ${closedShift.closedBy || closedShift.cashierName}</div>
                 <hr style="border-top:1px dashed #000; margin:6px 0;">
             </div>
@@ -1437,7 +1539,20 @@ class ReportsManager {
             </table>
             <div style="font-size:12px; line-height:1.6; border-top:1px dashed #000; padding-top:6px;">
                 <div style="display:flex; justify-content:space-between;"><span>عدد الفواتير المنفذة:</span><strong>${closedShift.totalInvoices || 0}</strong></div>
-                <div style="display:flex; justify-content:space-between;"><span>مبيعات السيستم المسجلة:</span><strong>${(closedShift.expectedCash || totalCash).toFixed(2)} ${currency}</strong></div>
+                <div style="display:flex; justify-content:space-between;"><span>مبيعات السيستم المسجلة (الإجمالي):</span><strong>${(closedShift.expectedCash || totalCash).toFixed(2)} ${currency}</strong></div>
+                <div style="display:flex; justify-content:space-between; font-size:11px; color:#333;">
+                    <span>- مبيعات كاش بالدرج:</span><strong>${(closedShift.cashSales !== undefined ? parseFloat(closedShift.cashSales) : (totalCash - (parseFloat(closedShift.transferSales) || 0))).toFixed(2)} ${currency}</strong>
+                </div>
+                ${parseFloat(closedShift.transferSales) > 0 ? `
+                    <div style="display:flex; justify-content:space-between; font-size:11px; color:#333;">
+                        <span>- مبيعات تحويل إلكتروني / محافظ:</span><strong>${parseFloat(closedShift.transferSales).toFixed(2)} ${currency}</strong>
+                    </div>
+                ` : ''}
+                ${parseFloat(closedShift.totalDiscounts) > 0 ? `
+                    <div style="display:flex; justify-content:space-between; font-size:11px; font-weight:bold; color:#000; border-top:1px dashed #ccc; margin-top:2px; padding-top:2px;">
+                        <span>- إجمالي الخصومات الممنوحة بالوردية:</span><strong>-${parseFloat(closedShift.totalDiscounts).toFixed(2)} ${currency}</strong>
+                    </div>
+                ` : ''}
                 <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:bold; border-top:1px dashed #000; padding-top:4px; margin-top:4px;">
                     <span>المبلغ الفعلي المعدود بالدرج:</span><span>${(closedShift.actualCash !== undefined ? parseFloat(closedShift.actualCash) : totalCash).toFixed(2)} ${currency}</span>
                 </div>

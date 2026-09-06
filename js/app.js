@@ -32,12 +32,9 @@ class AppController {
         const clockEl = document.getElementById('live-clock');
         const updateClock = () => {
             const now = new Date();
-            const timeStr = now.toLocaleTimeString('ar-EG', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: true
-            });
+            const timeStr = typeof window.formatTime12H === 'function'
+                ? window.formatTime12H(now, true)
+                : now.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
             if (clockEl) clockEl.textContent = timeStr;
         };
         updateClock();

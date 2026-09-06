@@ -7,7 +7,9 @@ class PosManager {
         this.cart = []; // [{ itemId, name, price, buyPrice, qty, unit, total }]
         this.customerName = 'عميل نقدي';
         this.discountAmount = 0;
+        this.discountReason = '';
         this.paymentMethod = 'cash';
+        this.transferPhone = '';
         this.paidAmount = 0;
     }
 
@@ -19,10 +21,62 @@ class PosManager {
         this.cart = [];
         this.customerName = 'عميل نقدي';
         this.discountAmount = 0;
+        this.discountReason = '';
+        this.paymentMethod = 'cash';
+        this.transferPhone = '';
         this.paidAmount = 0;
+
+        // Reset UI inputs
+        const custInput = document.getElementById('pos-customer-input');
+        if (custInput) custInput.value = 'عميل نقدي';
+
+        const discInput = document.getElementById('pos-discount-input');
+        if (discInput) discInput.value = 0;
+
+        const discReasonGroup = document.getElementById('pos-discount-reason-group');
+        if (discReasonGroup) discReasonGroup.style.display = 'none';
+
+        const discReasonInput = document.getElementById('pos-discount-reason-input');
+        if (discReasonInput) discReasonInput.value = '';
+
+        const paySelect = document.getElementById('pos-payment-method');
+        if (paySelect) paySelect.value = 'cash';
+
+        const phoneGroup = document.getElementById('pos-phone-group');
+        if (phoneGroup) phoneGroup.style.display = 'none';
+
+        const phoneInput = document.getElementById('pos-phone-input');
+        if (phoneInput) phoneInput.value = '';
+
         this.renderPosItemsSelector();
         this.renderCart();
         window.app.openModal('pos-modal');
+    }
+
+    onDiscountInputChange(val) {
+        this.discountAmount = parseFloat(val) || 0;
+        const discReasonGroup = document.getElementById('pos-discount-reason-group');
+        if (discReasonGroup) {
+            discReasonGroup.style.display = this.discountAmount > 0 ? 'block' : 'none';
+        }
+        this.renderCart();
+    }
+
+    onPaymentMethodChange(method) {
+        this.paymentMethod = method;
+        const phoneGroup = document.getElementById('pos-phone-group');
+        const phoneInput = document.getElementById('pos-phone-input');
+
+        if (method === 'transfer') {
+            if (phoneGroup) phoneGroup.style.display = 'block';
+            if (phoneInput) {
+                setTimeout(() => phoneInput.focus(), 100);
+            }
+            window.app.showToast('تم اختيار الدفع بالتحويل. يرجى تسجيل رقم تليفون العميل.', 'info');
+        } else {
+            if (phoneGroup) phoneGroup.style.display = 'none';
+        }
+        this.renderCart();
     }
 
     quickAddAndOpenCart(itemId) {
@@ -154,12 +208,6 @@ class PosManager {
         if (subtotalEl) subtotalEl.textContent = `${subtotal.toFixed(2)} ${currency}`;
         if (totalEl) totalEl.textContent = `${finalTotal.toFixed(2)} ${currency}`;
 
-        // Calculate change
-        const paidInput = document.getElementById('pos-paid-input');
-        const paid = paidInput ? (parseFloat(paidInput.value) || finalTotal) : finalTotal;
-        const change = Math.max(0, paid - finalTotal);
-        if (changeEl) changeEl.textContent = `${change.toFixed(2)} ${currency}`;
-
         if (checkoutBtn) {
             checkoutBtn.disabled = this.cart.length === 0;
         }
@@ -200,12 +248,30 @@ class PosManager {
 
         const subtotal = this.cart.reduce((sum, it) => sum + it.total, 0);
         const discount = parseFloat(document.getElementById('pos-discount-input')?.value) || 0;
+        const discountReason = (document.getElementById('pos-discount-reason-input')?.value || '').trim();
         const total = Math.max(0, subtotal - discount);
-        const customerName = document.getElementById('pos-customer-input')?.value || 'عميل نقدي';
-        const paidInput = document.getElementById('pos-paid-input');
-        const paid = paidInput && paidInput.value !== '' ? parseFloat(paidInput.value) : total;
-        const change = Math.max(0, paid - total);
-        const currentUser = window.auth.currentUser;
+        const customerName = (document.getElementById('pos-customer-input')?.value || '').trim() || 'عميل نقدي';
+        const paymentMethod = document.getElementById('pos-payment-method')?.value || 'cash';
+        const phoneInput = document.getElementById('pos-phone-input');
+        const transferPhone = (phoneInput ? phoneInput.value : '').trim();
+
+        // If transfer selected, enforce customer phone registration as requested
+        if (paymentMethod === 'transfer' && !transferPhone) {
+            window.app.showToast('عفواً! يرجى تسجيل رقم تليفون العميل لإتمام التحويل.', 'warning');
+            if (phoneInput) {
+                phoneInput.focus();
+                phoneInput.style.borderColor = '#ff3860';
+                phoneInput.style.boxShadow = '0 0 10px rgba(255, 56, 96, 0.4)';
+                setTimeout(() => {
+                    phoneInput.style.borderColor = '#ffaa00';
+                    phoneInput.style.boxShadow = '';
+                }, 2500);
+            }
+            return;
+        }
+
+        const currentUser = window.auth.currentUser || { id: 'admin', fullName: 'المسؤول' };
+        const activeShift = window.db.getActiveShift();
 
         const saleRecord = {
             cashierId: currentUser.id,
@@ -214,18 +280,22 @@ class PosManager {
             items: [...this.cart],
             subtotal: subtotal,
             discount: discount,
+            discountReason: discountReason,
             total: total,
-            paid: paid,
-            change: change,
-            paymentMethod: this.paymentMethod
+            paid: total,
+            change: 0,
+            paymentMethod: paymentMethod,
+            transferPhone: transferPhone,
+            shiftNumber: activeShift ? activeShift.shiftNumber : 1
         };
 
         const completedSale = window.db.addSale(saleRecord);
 
         window.app.playSound('cash');
-        window.app.showToast(`تم إتمام الفاتورة #${completedSale.id} بنجاح ومبلغ ${total.toFixed(2)} ج.م`, 'success');
+        const payMethodLabel = paymentMethod === 'transfer' ? `تحويل (${transferPhone})` : 'كاش';
+        window.app.showToast(`تم إتمام الفاتورة #${completedSale.id} بنجاح (${payMethodLabel}) بمبلغ ${total.toFixed(2)} ج.م`, 'success');
 
-        // Render receipt in print area and optionally print
+        // Render receipt in print area and trigger print
         this.printReceipt(completedSale);
 
         window.app.closeModal('pos-modal');
@@ -242,14 +312,26 @@ class PosManager {
 
         const settings = window.db.getSettings();
         const currency = settings.currency || 'ج.م';
+        const isTransfer = sale.paymentMethod === 'transfer';
+        const formattedTime = (sale.time && (sale.time.includes('ص') || sale.time.includes('م')))
+            ? sale.time
+            : (sale.timestamp ? window.formatTime12H(new Date(sale.timestamp)) : sale.time);
 
         printArea.innerHTML = `
             <div class="receipt-header">
                 <h3 style="margin: 0; font-size: 16px;">${settings.storeName || 'مخازن'}</h3>
-                <div style="font-size: 11px; margin: 4px 0;">فاتورة مبيعات نقدية #${sale.id}</div>
-                <div style="font-size: 10px;">التاريخ: ${sale.date} | ${sale.time}</div>
+                <div style="font-size: 11px; margin: 4px 0; font-weight: bold;">فاتورة مبيعات #${sale.id}</div>
+                <div style="font-size: 10px;">التاريخ: ${sale.date} | ${formattedTime}</div>
                 <div style="font-size: 10px;">الكاشير: ${sale.cashierName}</div>
                 <div style="font-size: 10px;">العميل: ${sale.customer}</div>
+                <div style="font-size: 10px; margin-top: 3px; font-weight: bold; padding: 2px 4px; background: #eee; border: 1px dashed #333; display: inline-block;">
+                    طريقة الدفع: ${isTransfer ? 'تحويل إلكتروني / محفظة' : 'كاش (نقدي)'}
+                </div>
+                ${isTransfer && sale.transferPhone ? `
+                    <div style="font-size: 11px; font-weight: bold; margin-top: 2px;">
+                        تليفون العميل: <span style="font-family: monospace;">${sale.transferPhone}</span>
+                    </div>
+                ` : ''}
                 <hr style="border-top: 1px dashed #000; margin: 6px 0;">
             </div>
             <table class="receipt-table">
@@ -276,8 +358,8 @@ class PosManager {
                     <span>${sale.subtotal.toFixed(2)} ${currency}</span>
                 </div>
                 ${sale.discount > 0 ? `
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>الخصم:</span>
+                    <div style="display: flex; justify-content: space-between; font-weight: bold; color: #000;">
+                        <span>الخصم ${sale.discountReason ? `(${sale.discountReason})` : ''}:</span>
                         <span>-${sale.discount.toFixed(2)} ${currency}</span>
                     </div>
                 ` : ''}
@@ -286,17 +368,19 @@ class PosManager {
                     <span>${sale.total.toFixed(2)} ${currency}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between;">
-                    <span>المدفوع:</span>
-                    <span>${sale.paid.toFixed(2)} ${currency}</span>
+                    <span>طريقة السداد:</span>
+                    <span>${isTransfer ? 'تحويل إلكتروني' : 'كاش نقدي'}</span>
                 </div>
-                <div style="display: flex; justify-content: space-between;">
-                    <span>الباقي للعميل:</span>
-                    <span>${sale.change.toFixed(2)} ${currency}</span>
-                </div>
+                ${isTransfer && sale.transferPhone ? `
+                    <div style="display: flex; justify-content: space-between; font-weight: bold;">
+                        <span>تليفون العميل:</span>
+                        <span style="font-family: monospace;">${sale.transferPhone}</span>
+                    </div>
+                ` : ''}
             </div>
             <div class="receipt-footer" style="margin-top: 12px;">
-                <p style="font-size: 10px; margin: 0;">${settings.receiptFooter}</p>
-                <p style="font-size: 9px; margin-top: 4px; color: #555;">نظام مخازن</p>
+                <p style="font-size: 10px; margin: 0;">${settings.receiptFooter || 'شكراً لتعاملكم معنا'}</p>
+                <p style="font-size: 9px; margin-top: 4px; color: #555;">نظام مخازن - وردية #${sale.shiftNumber || 1}</p>
             </div>
         `;
 
